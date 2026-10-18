@@ -20,7 +20,7 @@ Do-not-touch: no paid cloud spend; no secrets in git; no change to the 13 existi
 7. Eval suite: `evals/tasks.jsonl` (about 25 tasks: lookups, multi-step lookups, a write with confirm, a refusal case where data is absent, a prompt-injection case inside a ticket text). Checks are programmatic (expected tool called, expected facts in answer, no forbidden write). Runner prints pass rate, mean cost and latency, writes `evals/results.json`. Gate: exit 1 if pass rate < threshold in `evals/gate.json` (absolute, set in step 8 from measured variance). Proof: runner run locally with a scripted model shows the gate fails on a deliberately broken tool and passes on the good one.
 8. Live eval: same runner with the real model. Run it 3 times to measure variance before committing a baseline. The live gate uses an absolute threshold with margin (set from the measured minimum, not a delta). The scripted-model eval is the deterministic regression check. Proof: 3 results files with pass rates, spend per run recorded. Gate proof: one deliberate break pushed to a throwaway branch gives a red CI run; the main branch gives a green run.
 9. Docker: slim image, non-root user, healthcheck. Proof: `docker build` and `docker run` then `curl /healthz` returns 200 (run locally, not deploy).
-10. CI: GitHub Actions workflow `ci.yml`: lint (ruff), pytest, eval gate (live, uses repo secret ANTHROPIC_API_KEY; fails if the secret is missing rather than silently skipping), docker build. Proof: green run URL.
+10. CI: GitHub Actions workflow `ci.yml`: lint (ruff), pytest, eval gate (replay of recorded live answers: no key, no spend; fails below the gate in evals/gate.json), docker build. Proof: green run URL.
 11. Deploy: free tier only. BLOCKED until Chris chooses a host and provides an account (see Blockers).
 12. README: architecture diagram (mermaid), how to run, tests, eval table (from results.json), live demo link (after step 11), limits, what it does not do. No gap statements; no claims about Chris beyond verified facts.
 13. Evidence file and independent review. Reviewer (sonnet) reads the diff and reports only; implementer fixes.
@@ -41,7 +41,7 @@ Do-not-touch: no paid cloud spend; no secrets in git; no change to the 13 existi
 - AWS alternative: Lambda container image + Function URL. App Runner is not free. Check ECR free storage.
 
 ## Eval key and spend
-- ANTHROPIC key: use the provider the existing portfolio apps already use. Set as GitHub secret with `gh secret set` from stdin, never echoed, never in git.
+- Provider: OpenRouter (Anthropic-compatible endpoint), as decided in SM.1. The live key is used only by the local runner (`OPS_AGENT_API_KEY`) for the three live runs. CI holds no key; the server holds no key (BYOK).
 - Record spend per live eval run (tokens and USD estimate) in the evidence file.
 
 ## Blockers (raised only at deploy, after probing)

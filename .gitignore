@@ -5,5 +5,6 @@ __pycache__/
 .ruff_cache/
 .env
 data/tickets.runtime.json
+data/limits.runtime.json
 evals/results-*.json
 graphify-out/

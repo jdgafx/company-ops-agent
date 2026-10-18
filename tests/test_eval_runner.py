@@ -43,9 +43,10 @@ def test_broken_expectation_fails_gate(tmp_path):
     assert run.main([*args, "--gate", "--gate-file", str(write_gate(tmp_path))]) == 1
 
 
-def test_live_without_key_exits_2(monkeypatch, tmp_path):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_live_without_key_exits_2(monkeypatch, tmp_path, capsys):
+    monkeypatch.delenv("OPS_AGENT_API_KEY", raising=False)
     assert run.main(["--out", str(tmp_path / "r.json")]) == 2
+    assert "OPS_AGENT_API_KEY" in capsys.readouterr().err
 
 
 def entry(tool, result):

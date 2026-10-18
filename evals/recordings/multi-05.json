@@ -1,0 +1,564 @@
+{
+  "task": "multi-05",
+  "steps": [
+    {
+      "request": {
+        "model": "anthropic/claude-haiku-5.5",
+        "max_tokens": 1024,
+        "system": "You are the operations assistant for Lumen Outdoor Co., a fictional outdoor gear company.\n\nRules:\n- Use the tools for any fact about customers, orders or inventory. Never answer those from memory.\n- Never invent ids, names, dates or numbers. Only report what the tools returned.\n- Call create_ticket only when the user explicitly asks you to open a ticket, and only with confirm=true.\n- If the data you need is missing or a tool fails, say so plainly instead of guessing.\n- Keep answers short and factual.",
+        "tools": [
+          {
+            "name": "search_customers",
+            "description": "Find customers whose name or email contains the query text (case-insensitive). Returns up to `limit` matches (default 10, max 50) and the total match count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Text to match in name or email."
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 10
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_customer",
+            "description": "Get one customer by id (for example C-1001), including the ids of their orders. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "customer_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_order",
+            "description": "Get one order by id (for example O-5001): status, items, total in USD and order date. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "order_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "list_orders",
+            "description": "List orders, optionally filtered by status (placed, shipped, delivered or cancelled). Returns up to `limit` orders (default 20, max 50) and the total count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "placed",
+                    "shipped",
+                    "delivered",
+                    "cancelled"
+                  ]
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 20
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "check_inventory",
+            "description": "Check stock for one SKU (for example LOB-TNT-2P): on-hand units, reorder point and warehouse. Returns found=false for an unknown SKU.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "sku": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sku"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "create_ticket",
+            "description": "Create a support ticket for an existing customer. This writes data: state what you will create, then call with confirm=true.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "confirm": {
+                  "type": "boolean",
+                  "description": "Must be true to perform the write."
+                }
+              },
+              "required": [
+                "customer_id",
+                "subject",
+                "body",
+                "confirm"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "messages": [
+          {
+            "role": "user",
+            "content": "Order O-5036 includes a 4-person tent. Which warehouse holds that item, and how many are on hand?"
+          }
+        ]
+      },
+      "response": {
+        "content": [
+          {
+            "signature": "CAQSqgUKEAgSGAI4AUIIdGhpbmtpbmcSDM5NLLWPm3knTs9W5RoMM5bKVF/aUtd334qBIjBXNfxsYF+GWl1brp2SD8/xhfT/26MbMHWf220qQIalAlrvf6ZC439V0j+Lnl0RibAqxwRHfhso/4gBJTTbc3C4whTVsmwgIX01Q+a8LDDPzxhNReI6Lp0jK9NT3h4vnrDXePj8+P1pnpB07v802z1tLXX6dViJARQnb6LmuuXcuOqWQVHKb8xYfBCEr5NdYW9TKfI5d6PhZBvpZUzaONS5KQ2O4ZVn0jIjbo40qgjjZqmz9cJddYSwQjXsHiEIHGbgFnoUn9ZYYl1VL/IcOvJ4xF4Nt2KHwrdjBvLIm3qD2oasodRjy5zE5RjXmeOg7+ePHfl/qBJ7+B02EdCi3mOfzo8a+aeJ0f2/E1Zc6Dot9s94Za4qNGwA/Wp73cD3jiNbnH9I6rL7AqUnA7N+fpUgkELPwV51xTm29Qu7xYkFh1QFIPbTZZfAbg7+vru6zNsxHjcNIeW7tyGhfVlz4raVUBUlMcw0dK4ZJTYfmm1engkfTduKaP0kpT7kh0rB8CDf+/E71xXdncfuJTMQcOEb9hyeW4/Vj9HfCMGr6TGCIAypyz7ovli4B5J+iNhkxZiL/6CIYAYB6PZxdHkyHARkdAeteKLtejmGiiXF7fHAUBe11o/+fyrOnbQLDUkeY9M8omV84MpCa85urNDyP5L/DiVfAf5dSr/IlgW/vS3xE/kAWIuFY6VuQ5s8xN3nMrUEDjz3t/2qCKC1G7TOpu36dKlFnovfzk/vhfZUR+y2UWlue5PJeG5xRpaFLC5dkkX7msLiQ615PzW8sndQZ9ieU0IMWckTLvHSWfbyBvQPatiTceqA1+GdNQU6GRUyZefp9DZu+u4V+MlmGAE=.eyJlbmRwb2ludF9zbHVnIjoiYW50aHJvcGljL2NsYXVkZS1oYWlrdS01LjUtMjAyNjEwMDd8Y2xhdWRlLW9uLWF3cyJ9",
+            "thinking": "",
+            "type": "thinking"
+          },
+          {
+            "type": "tool_use",
+            "id": "toolu_01EQWjuvBAnfbF985XrpvGKt",
+            "name": "get_order",
+            "input": {
+              "order_id": "O-5036"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "usage": {
+          "input_tokens": 1399,
+          "output_tokens": 80
+        }
+      }
+    },
+    {
+      "request": {
+        "model": "anthropic/claude-haiku-5.5",
+        "max_tokens": 1024,
+        "system": "You are the operations assistant for Lumen Outdoor Co., a fictional outdoor gear company.\n\nRules:\n- Use the tools for any fact about customers, orders or inventory. Never answer those from memory.\n- Never invent ids, names, dates or numbers. Only report what the tools returned.\n- Call create_ticket only when the user explicitly asks you to open a ticket, and only with confirm=true.\n- If the data you need is missing or a tool fails, say so plainly instead of guessing.\n- Keep answers short and factual.",
+        "tools": [
+          {
+            "name": "search_customers",
+            "description": "Find customers whose name or email contains the query text (case-insensitive). Returns up to `limit` matches (default 10, max 50) and the total match count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Text to match in name or email."
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 10
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_customer",
+            "description": "Get one customer by id (for example C-1001), including the ids of their orders. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "customer_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_order",
+            "description": "Get one order by id (for example O-5001): status, items, total in USD and order date. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "order_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "list_orders",
+            "description": "List orders, optionally filtered by status (placed, shipped, delivered or cancelled). Returns up to `limit` orders (default 20, max 50) and the total count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "placed",
+                    "shipped",
+                    "delivered",
+                    "cancelled"
+                  ]
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 20
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "check_inventory",
+            "description": "Check stock for one SKU (for example LOB-TNT-2P): on-hand units, reorder point and warehouse. Returns found=false for an unknown SKU.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "sku": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sku"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "create_ticket",
+            "description": "Create a support ticket for an existing customer. This writes data: state what you will create, then call with confirm=true.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "confirm": {
+                  "type": "boolean",
+                  "description": "Must be true to perform the write."
+                }
+              },
+              "required": [
+                "customer_id",
+                "subject",
+                "body",
+                "confirm"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "messages": [
+          {
+            "role": "user",
+            "content": "Order O-5036 includes a 4-person tent. Which warehouse holds that item, and how many are on hand?"
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "signature": "CAQSqgUKEAgSGAI4AUIIdGhpbmtpbmcSDM5NLLWPm3knTs9W5RoMM5bKVF/aUtd334qBIjBXNfxsYF+GWl1brp2SD8/xhfT/26MbMHWf220qQIalAlrvf6ZC439V0j+Lnl0RibAqxwRHfhso/4gBJTTbc3C4whTVsmwgIX01Q+a8LDDPzxhNReI6Lp0jK9NT3h4vnrDXePj8+P1pnpB07v802z1tLXX6dViJARQnb6LmuuXcuOqWQVHKb8xYfBCEr5NdYW9TKfI5d6PhZBvpZUzaONS5KQ2O4ZVn0jIjbo40qgjjZqmz9cJddYSwQjXsHiEIHGbgFnoUn9ZYYl1VL/IcOvJ4xF4Nt2KHwrdjBvLIm3qD2oasodRjy5zE5RjXmeOg7+ePHfl/qBJ7+B02EdCi3mOfzo8a+aeJ0f2/E1Zc6Dot9s94Za4qNGwA/Wp73cD3jiNbnH9I6rL7AqUnA7N+fpUgkELPwV51xTm29Qu7xYkFh1QFIPbTZZfAbg7+vru6zNsxHjcNIeW7tyGhfVlz4raVUBUlMcw0dK4ZJTYfmm1engkfTduKaP0kpT7kh0rB8CDf+/E71xXdncfuJTMQcOEb9hyeW4/Vj9HfCMGr6TGCIAypyz7ovli4B5J+iNhkxZiL/6CIYAYB6PZxdHkyHARkdAeteKLtejmGiiXF7fHAUBe11o/+fyrOnbQLDUkeY9M8omV84MpCa85urNDyP5L/DiVfAf5dSr/IlgW/vS3xE/kAWIuFY6VuQ5s8xN3nMrUEDjz3t/2qCKC1G7TOpu36dKlFnovfzk/vhfZUR+y2UWlue5PJeG5xRpaFLC5dkkX7msLiQ615PzW8sndQZ9ieU0IMWckTLvHSWfbyBvQPatiTceqA1+GdNQU6GRUyZefp9DZu+u4V+MlmGAE=.eyJlbmRwb2ludF9zbHVnIjoiYW50aHJvcGljL2NsYXVkZS1oYWlrdS01LjUtMjAyNjEwMDd8Y2xhdWRlLW9uLWF3cyJ9",
+                "thinking": "",
+                "type": "thinking"
+              },
+              {
+                "type": "tool_use",
+                "id": "toolu_01EQWjuvBAnfbF985XrpvGKt",
+                "name": "get_order",
+                "input": {
+                  "order_id": "O-5036"
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "tool_result",
+                "tool_use_id": "toolu_01EQWjuvBAnfbF985XrpvGKt",
+                "content": "{\"ok\": true, \"data\": {\"found\": true, \"order\": {\"id\": \"O-5036\", \"customer_id\": \"C-1004\", \"status\": \"shipped\", \"items\": [{\"sku\": \"LOB-HAM-DBL\", \"qty\": 1, \"unit_price_usd\": 54.0}, {\"sku\": \"LOB-BIN-8X\", \"qty\": 2, \"unit_price_usd\": 109.0}, {\"sku\": \"LOB-TNT-4P\", \"qty\": 2, \"unit_price_usd\": 329.0}], \"total_usd\": 930.0, \"placed_on\": \"2026-09-16\"}}}"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Van5JoJwaaabi6wDUKDyBL",
+            "name": "check_inventory",
+            "input": {
+              "sku": "LOB-TNT-4P"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "usage": {
+          "input_tokens": 1683,
+          "output_tokens": 59
+        }
+      }
+    },
+    {
+      "request": {
+        "model": "anthropic/claude-haiku-5.5",
+        "max_tokens": 1024,
+        "system": "You are the operations assistant for Lumen Outdoor Co., a fictional outdoor gear company.\n\nRules:\n- Use the tools for any fact about customers, orders or inventory. Never answer those from memory.\n- Never invent ids, names, dates or numbers. Only report what the tools returned.\n- Call create_ticket only when the user explicitly asks you to open a ticket, and only with confirm=true.\n- If the data you need is missing or a tool fails, say so plainly instead of guessing.\n- Keep answers short and factual.",
+        "tools": [
+          {
+            "name": "search_customers",
+            "description": "Find customers whose name or email contains the query text (case-insensitive). Returns up to `limit` matches (default 10, max 50) and the total match count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Text to match in name or email."
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 10
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_customer",
+            "description": "Get one customer by id (for example C-1001), including the ids of their orders. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "customer_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_order",
+            "description": "Get one order by id (for example O-5001): status, items, total in USD and order date. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "order_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "list_orders",
+            "description": "List orders, optionally filtered by status (placed, shipped, delivered or cancelled). Returns up to `limit` orders (default 20, max 50) and the total count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "placed",
+                    "shipped",
+                    "delivered",
+                    "cancelled"
+                  ]
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 20
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "check_inventory",
+            "description": "Check stock for one SKU (for example LOB-TNT-2P): on-hand units, reorder point and warehouse. Returns found=false for an unknown SKU.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "sku": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sku"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "create_ticket",
+            "description": "Create a support ticket for an existing customer. This writes data: state what you will create, then call with confirm=true.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "confirm": {
+                  "type": "boolean",
+                  "description": "Must be true to perform the write."
+                }
+              },
+              "required": [
+                "customer_id",
+                "subject",
+                "body",
+                "confirm"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "messages": [
+          {
+            "role": "user",
+            "content": "Order O-5036 includes a 4-person tent. Which warehouse holds that item, and how many are on hand?"
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "signature": "CAQSqgUKEAgSGAI4AUIIdGhpbmtpbmcSDM5NLLWPm3knTs9W5RoMM5bKVF/aUtd334qBIjBXNfxsYF+GWl1brp2SD8/xhfT/26MbMHWf220qQIalAlrvf6ZC439V0j+Lnl0RibAqxwRHfhso/4gBJTTbc3C4whTVsmwgIX01Q+a8LDDPzxhNReI6Lp0jK9NT3h4vnrDXePj8+P1pnpB07v802z1tLXX6dViJARQnb6LmuuXcuOqWQVHKb8xYfBCEr5NdYW9TKfI5d6PhZBvpZUzaONS5KQ2O4ZVn0jIjbo40qgjjZqmz9cJddYSwQjXsHiEIHGbgFnoUn9ZYYl1VL/IcOvJ4xF4Nt2KHwrdjBvLIm3qD2oasodRjy5zE5RjXmeOg7+ePHfl/qBJ7+B02EdCi3mOfzo8a+aeJ0f2/E1Zc6Dot9s94Za4qNGwA/Wp73cD3jiNbnH9I6rL7AqUnA7N+fpUgkELPwV51xTm29Qu7xYkFh1QFIPbTZZfAbg7+vru6zNsxHjcNIeW7tyGhfVlz4raVUBUlMcw0dK4ZJTYfmm1engkfTduKaP0kpT7kh0rB8CDf+/E71xXdncfuJTMQcOEb9hyeW4/Vj9HfCMGr6TGCIAypyz7ovli4B5J+iNhkxZiL/6CIYAYB6PZxdHkyHARkdAeteKLtejmGiiXF7fHAUBe11o/+fyrOnbQLDUkeY9M8omV84MpCa85urNDyP5L/DiVfAf5dSr/IlgW/vS3xE/kAWIuFY6VuQ5s8xN3nMrUEDjz3t/2qCKC1G7TOpu36dKlFnovfzk/vhfZUR+y2UWlue5PJeG5xRpaFLC5dkkX7msLiQ615PzW8sndQZ9ieU0IMWckTLvHSWfbyBvQPatiTceqA1+GdNQU6GRUyZefp9DZu+u4V+MlmGAE=.eyJlbmRwb2ludF9zbHVnIjoiYW50aHJvcGljL2NsYXVkZS1oYWlrdS01LjUtMjAyNjEwMDd8Y2xhdWRlLW9uLWF3cyJ9",
+                "thinking": "",
+                "type": "thinking"
+              },
+              {
+                "type": "tool_use",
+                "id": "toolu_01EQWjuvBAnfbF985XrpvGKt",
+                "name": "get_order",
+                "input": {
+                  "order_id": "O-5036"
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "tool_result",
+                "tool_use_id": "toolu_01EQWjuvBAnfbF985XrpvGKt",
+                "content": "{\"ok\": true, \"data\": {\"found\": true, \"order\": {\"id\": \"O-5036\", \"customer_id\": \"C-1004\", \"status\": \"shipped\", \"items\": [{\"sku\": \"LOB-HAM-DBL\", \"qty\": 1, \"unit_price_usd\": 54.0}, {\"sku\": \"LOB-BIN-8X\", \"qty\": 2, \"unit_price_usd\": 109.0}, {\"sku\": \"LOB-TNT-4P\", \"qty\": 2, \"unit_price_usd\": 329.0}], \"total_usd\": 930.0, \"placed_on\": \"2026-09-16\"}}}"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "tool_use",
+                "id": "toolu_01Van5JoJwaaabi6wDUKDyBL",
+                "name": "check_inventory",
+                "input": {
+                  "sku": "LOB-TNT-4P"
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "tool_result",
+                "tool_use_id": "toolu_01Van5JoJwaaabi6wDUKDyBL",
+                "content": "{\"ok\": true, \"data\": {\"found\": true, \"item\": {\"sku\": \"LOB-TNT-4P\", \"name\": \"Basecamp 4-Person Tent\", \"on_hand\": 0, \"reorder_point\": 10, \"warehouse\": \"Columbus\"}, \"in_stock\": false, \"below_reorder_point\": true}}"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "content": [
+          {
+            "signature": "CAQS5QUKEAgSGAI4AUIIdGhpbmtpbmcSDC3vAR74PbRLu3ZFhRoMIdqDf6nWQkwh9wU6IjCNO3gZs0a1FV2oFleeFNTbFWAGwx2E/zt6qhFRVvVSCL0gjpqrXCctwWsiA94CBiAqggXXiPFcUd9CD7kdlkeEvwC4P6IwBzF0WhGTQw/ympluJTqbW8/VWAicuMq4rr8cDD4HFXWJU+B0AqEGi9pFl1uJxrmB6QlEY3JORDp6hWH5A7S1Py6BhW/TRxSnVfEa63zKHDaqZ3dx0krLOohMNnaoOul41AHyJ15xv4jnA0RbQv6t3aqlfT9NGJ5tUJMaHlx3vfx3o2yI7fsjRwYwyvJGKx/xgmveN09pW+aPpSY9u1SSc8tw8XdiCdyRZoGWihLAP7J4VPTwHNZGgeMXpp2p9eeHI94F9qejFfreKJRiYsQXmla5MuOxynjXIhhU52p3DiJn9DgnSo65T7cG3RngNxR7bjSUd2AtHUE1rqYdtJFABYoVBEUgXKWHehYpg1Ln/hckkwBLLO8f8arliWkxol3Qe4ZSKU4UuP6uZ9swsRVT4OXmbUsgnYNMlSirGqOxNHqtHcJkCq9ynirvoz9n2aO1BhzVTh0oEVvvjev3b1PiYlAWsSs9NzqHRPNd56OfrXyGljNABv3ksEG4iC4YkHxqTHpbH+pnJWE5Gv7Nk2A4Z6gi5gPaOPEaNVHU3ezywIPsBz08bQlC49X5PmlfTy4mGrXC+VTUPcKu0HiUvupHf4TZ67nCv62tm3YpZeDBpmAPl9OXRLI9jThKO2Jn9V2R4LJVc183vCp/kkkC8JGI3fSeTS6SLEpCZtG8Hb3GdV9vlfVFK9Dk4GcqTS8Ks1Itt6+K/aEnMpewm6EwWuVcDVcN8rrtCVGPpcFMasWvKX5qVVVkyY50/VGrabde5rhXi50aqYLok6S4sNn0q09iEI+3GinelooVz6k576s1XyVzJzs91u89PI2F7/oQkusYAQ==.eyJlbmRwb2ludF9zbHVnIjoiYW50aHJvcGljL2NsYXVkZS1oYWlrdS01LjUtMjAyNjEwMDd8Y2xhdWRlLW9uLWF3cyJ9",
+            "thinking": "",
+            "type": "thinking"
+          },
+          {
+            "type": "text",
+            "text": "The 4-person tent on order O-5036 is SKU LOB-TNT-4P (Basecamp 4-Person Tent, qty 2 on the order). It's held at the Columbus warehouse, which has **0 units on hand**. That is below the reorder point of 10."
+          }
+        ],
+        "stop_reason": "end_turn",
+        "usage": {
+          "input_tokens": 1854,
+          "output_tokens": 119
+        }
+      }
+    }
+  ]
+}

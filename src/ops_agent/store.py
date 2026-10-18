@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -66,7 +67,15 @@ def _load(path: pathlib.Path) -> list[dict[str, Any]]:
 
 
 class Store:
-    def __init__(self, data_dir: pathlib.Path, tickets_path: pathlib.Path | None = None):
+    def __init__(
+        self,
+        data_dir: pathlib.Path,
+        tickets_path: pathlib.Path | None = None,
+        clock: Callable[[], datetime] | None = None,
+    ):
+        # Injectable so the eval runner can fix created_at; ticket ids come from the ticket
+        # count, so they are deterministic whenever the starting tickets file is.
+        self._clock = clock or (lambda: datetime.now(UTC))
         data_dir = pathlib.Path(data_dir)
         self._customers = {c["id"]: Customer(**c) for c in _load(data_dir / "customers.json")}
         self._orders = {o["id"]: Order(**o) for o in _load(data_dir / "orders.json")}
@@ -138,7 +147,7 @@ class Store:
             customer_id=customer_id,
             subject=subject,
             body=body,
-            created_at=datetime.now(UTC).isoformat(timespec="seconds"),
+            created_at=self._clock().isoformat(timespec="seconds"),
         )
         self._tickets.append(ticket)
         if self._tickets_path is not None:

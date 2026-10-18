@@ -5,7 +5,7 @@ from types import SimpleNamespace as NS
 import pytest
 
 from ops_agent.agent import run_agent
-from ops_agent.config import Settings
+from ops_agent.config import DEFAULT_MODEL, Settings
 from ops_agent.tools import ToolRegistry, ToolSpec
 
 
@@ -58,7 +58,7 @@ def test_direct_answer_no_tools():
     assert out["stop_reason"] == "end_turn"
     assert out["steps"] == 1 and out["trace"] == []
     sent = client.calls[0]
-    assert sent["model"] == "claude-haiku-5-5"
+    assert sent["model"] == DEFAULT_MODEL
     assert "temperature" not in sent
     assert {t["name"] for t in sent["tools"]} == {"get_order", "create_ticket"}
     assert "Lumen Outdoor Co." in sent["system"]
@@ -134,7 +134,7 @@ def test_usage_summed():
 def test_settings_defaults_and_env(monkeypatch):
     for k in ("OPS_AGENT_MODEL", "OPS_AGENT_MAX_STEPS", "OPS_AGENT_MAX_TOKENS"):
         monkeypatch.delenv(k, raising=False)
-    assert Settings.from_env() == Settings("claude-haiku-5-5", 8, 1024)
+    assert Settings.from_env() == Settings(DEFAULT_MODEL, 8, 1024)
     monkeypatch.setenv("OPS_AGENT_MODEL", "m")
     monkeypatch.setenv("OPS_AGENT_MAX_STEPS", "4")
     monkeypatch.setenv("OPS_AGENT_MAX_TOKENS", "256")

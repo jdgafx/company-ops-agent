@@ -32,8 +32,11 @@ def make(tmp_path, runner=None, **env):
     return TestClient(app)
 
 
+KEY_HEADERS = {"X-Provider-Key": "test-key-0123456789abcdef"}
+
+
 def ask(c, q="How many open tickets?"):
-    return c.post("/v1/ask", json={"question": q})
+    return c.post("/v1/ask", json={"question": q}, headers=KEY_HEADERS)
 
 
 def test_healthz(tmp_path):
@@ -86,7 +89,8 @@ def test_runner_exception_500_generic(tmp_path, caplog):
     r = ask(make(tmp_path, runner=boom))
     assert r.status_code == 500 and r.json() == {"error": "internal_error"}
     assert "secret-detail" not in r.text
-    assert "secret-detail" in caplog.text
+    assert "secret-detail" not in caplog.text  # class name only, never exception text
+    assert "RuntimeError" in caplog.text
 
 
 def test_default_runner_persists_tickets_across_requests(tmp_path, monkeypatch):

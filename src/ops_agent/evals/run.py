@@ -1,9 +1,12 @@
 """Eval runner: replays tasks.jsonl through the agent loop and checks each expectation.
 
-Live mode (default) calls the real model and needs ANTHROPIC_API_KEY. --scripted swaps in a
-deterministic fake client that issues each task's "scripted" tool calls and answers from the
-task's expected fields. It is the regression check for the runner, the checks and the gate
-wiring; it does NOT measure model quality.
+Live mode (default) calls the real model and needs OPS_AGENT_API_KEY. --record does the same
+and also saves every request/response per task under evals/recordings/. --replay answers from
+those recordings with no key and no network, and fails a task when the agent's request differs
+from the recording (changed tool output, prompt or tool schema); this is what CI runs.
+--scripted swaps in a deterministic fake client that issues each task's "scripted" tool calls and
+answers from the task's expected fields. It is the regression check for the runner, the checks
+and the gate wiring; it does NOT measure model quality.
 
 Each task gets its own Store with a throwaway tickets file, so data/ is never written.
 """
@@ -23,11 +26,16 @@ from typing import Any
 from ops_agent.agent import run_agent
 from ops_agent.catalog import build_registry
 from ops_agent.config import Settings, make_client
+from ops_agent.evals.replay import Recorder, ReplayClient, ReplayError
 from ops_agent.store import Store
 
 # ESTIMATE only: flat per-million-token prices, not read from any billing source.
 EST_INPUT_USD_PER_MTOK = 1.00
 EST_OUTPUT_USD_PER_MTOK = 5.00
+
+# Fixed so replayed tickets carry the same created_at as the recording.
+EVAL_CLOCK = datetime(2026, 1, 1, tzinfo=UTC)
+KEY_ENV = "OPS_AGENT_API_KEY"
 
 MISSING_PHRASES = (
     "not found", "no record", "does not", "no order", "no customer", "not in",
@@ -99,14 +107,22 @@ def check_task(expect: dict[str, Any], out: dict[str, Any], write_tools: set[str
 
 def run_task(task: dict[str, Any], *, client: Any, settings: Settings, data_dir: pathlib.Path,
              tmp: pathlib.Path) -> dict[str, Any]:
-    store = Store(data_dir=data_dir, tickets_path=tmp / f"{task['id']}-tickets.json")
+    store = Store(data_dir=data_dir, tickets_path=tmp / f"{task['id']}-tickets.json",
+                  clock=lambda: EVAL_CLOCK)
     tools = build_registry(store)
     write_tools = {s.name for s in tools.specs() if s.write}
+    begin = getattr(client, "begin", None)
+    if begin:
+        begin(task["id"])
     try:
         out = run_agent(task["question"], tools=tools, client=client, settings=settings)
     except Exception as exc:  # noqa: BLE001 - one API failure must not abort the whole run
+        # Replay errors are our own text (task, step, what changed). Anything else may echo
+        # request or provider details, so only the class name goes into the results file.
+        detail = f"{type(exc).__name__}: {exc}" if isinstance(exc, ReplayError) else (
+            type(exc).__name__)
         return {"id": task["id"], "category": task["category"], "passed": False,
-                "failed_checks": [f"error: {type(exc).__name__}: {exc}"], "tools": [],
+                "failed_checks": [f"error: {detail}"], "tools": [],
                 "latency_ms": 0.0, "input_tokens": 0, "output_tokens": 0, "steps": 0,
                 "stop_reason": "error"}
     failed = check_task(task["expect"], out, write_tools)
@@ -125,13 +141,20 @@ def load_tasks(path: pathlib.Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in lines if line.strip()]
 
 
-def run_all(tasks: list[dict[str, Any]], *, scripted: bool) -> dict[str, Any]:
+def run_all(tasks: list[dict[str, Any]], *, mode: str = "live", client: Any = None,
+            recordings_dir: pathlib.Path = pathlib.Path("evals/recordings")) -> dict[str, Any]:
+    """mode: live, record, replay or scripted. A client may be injected for live/record."""
     data_dir = pathlib.Path(os.environ.get("OPS_DATA_DIR", "data"))
-    if scripted:
+    if mode == "scripted":
         settings, client = Settings(), ScriptedClient(tasks)
+    elif mode == "replay":
+        # Defaults, not the environment: replay must not depend on the caller's OPS_AGENT_* vars.
+        settings, client = Settings(), ReplayClient(recordings_dir)
     else:
         settings = Settings.from_env()
-        client = make_client(settings)
+        client = client or make_client(settings, os.environ[KEY_ENV])
+        if mode == "record":
+            client = Recorder(client, recordings_dir)
     with tempfile.TemporaryDirectory(prefix="ops-eval-") as d:
         results = [run_task(t, client=client, settings=settings, data_dir=data_dir,
                             tmp=pathlib.Path(d)) for t in tasks]
@@ -141,13 +164,14 @@ def run_all(tasks: list[dict[str, Any]], *, scripted: bool) -> dict[str, Any]:
     tout = sum(r["output_tokens"] for r in results)
     return {
         "run_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "model": "scripted" if scripted else settings.model,
-        "mode": "scripted" if scripted else "live",
+        "model": "scripted" if mode == "scripted" else (
+            (client.model if mode == "replay" else None) or settings.model),
+        "mode": mode,
         "pass_rate": passed / total if total else 0.0,
         "passed": passed, "total": total,
         "mean_latency_ms": round(sum(r["latency_ms"] for r in results) / total, 1) if total else 0.0,
         "total_input_tokens": tin, "total_output_tokens": tout,
-        "est_cost_usd_estimate_only": round(
+        "est_cost_usd_estimate_only": 0.0 if mode == "replay" else round(
             tin * EST_INPUT_USD_PER_MTOK / 1e6 + tout * EST_OUTPUT_USD_PER_MTOK / 1e6, 4),
         "tasks": results,
     }
@@ -172,14 +196,23 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--gate-file", default="evals/gate.json")
     ap.add_argument("--out", default=None, help="results path (default evals/results-<UTC>.json)")
     ap.add_argument("--gate", action="store_true", help="exit 1 if pass rate < gate threshold")
-    ap.add_argument("--scripted", action="store_true", help="deterministic fake client, no network")
+    ap.add_argument("--recordings-dir", default="evals/recordings")
+    modes = ap.add_mutually_exclusive_group()
+    modes.add_argument("--scripted", action="store_true", help="deterministic fake client, no network")
+    modes.add_argument("--record", action="store_true",
+                       help=f"run live (needs {KEY_ENV}) and save recordings")
+    modes.add_argument("--replay", action="store_true",
+                       help="answer from recordings; no key, no network, no spend")
     args = ap.parse_args(argv)
 
-    if not args.scripted and not os.environ.get("ANTHROPIC_API_KEY"):
-        print("ANTHROPIC_API_KEY is not set; refusing to run live. Use --scripted for offline.",
+    mode = "scripted" if args.scripted else "record" if args.record else (
+        "replay" if args.replay else "live")
+    if mode in ("live", "record") and not os.environ.get(KEY_ENV):
+        print(f"{KEY_ENV} is not set; refusing to run live. Use --replay or --scripted for offline.",
               file=sys.stderr)
         return 2
-    report = run_all(load_tasks(pathlib.Path(args.tasks)), scripted=args.scripted)
+    report = run_all(load_tasks(pathlib.Path(args.tasks)), mode=mode,
+                     recordings_dir=pathlib.Path(args.recordings_dir))
     out = pathlib.Path(args.out or f"evals/results-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2) + "\n")

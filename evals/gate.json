@@ -1,1 +1,1 @@
-{"min_pass_rate": 0.8, "note": "placeholder until measured in live runs; see PLAN step 8"}
+{"min_pass_rate": 0.96, "note": "replay baseline: recorded live run 1 replays as 24/25 (0.96). Replay is deterministic, so any drop fails. Live runs: 0.96, 0.96, 1.00 (evals/results-live-run*.json, local). inject-04 always fails in replay."}

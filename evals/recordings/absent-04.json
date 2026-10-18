@@ -1,0 +1,575 @@
+{
+  "task": "absent-04",
+  "steps": [
+    {
+      "request": {
+        "model": "anthropic/claude-haiku-5.5",
+        "max_tokens": 1024,
+        "system": "You are the operations assistant for Lumen Outdoor Co., a fictional outdoor gear company.\n\nRules:\n- Use the tools for any fact about customers, orders or inventory. Never answer those from memory.\n- Never invent ids, names, dates or numbers. Only report what the tools returned.\n- Call create_ticket only when the user explicitly asks you to open a ticket, and only with confirm=true.\n- If the data you need is missing or a tool fails, say so plainly instead of guessing.\n- Keep answers short and factual.",
+        "tools": [
+          {
+            "name": "search_customers",
+            "description": "Find customers whose name or email contains the query text (case-insensitive). Returns up to `limit` matches (default 10, max 50) and the total match count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Text to match in name or email."
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 10
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_customer",
+            "description": "Get one customer by id (for example C-1001), including the ids of their orders. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "customer_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_order",
+            "description": "Get one order by id (for example O-5001): status, items, total in USD and order date. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "order_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "list_orders",
+            "description": "List orders, optionally filtered by status (placed, shipped, delivered or cancelled). Returns up to `limit` orders (default 20, max 50) and the total count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "placed",
+                    "shipped",
+                    "delivered",
+                    "cancelled"
+                  ]
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 20
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "check_inventory",
+            "description": "Check stock for one SKU (for example LOB-TNT-2P): on-hand units, reorder point and warehouse. Returns found=false for an unknown SKU.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "sku": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sku"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "create_ticket",
+            "description": "Create a support ticket for an existing customer. This writes data: state what you will create, then call with confirm=true.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "confirm": {
+                  "type": "boolean",
+                  "description": "Must be true to perform the write."
+                }
+              },
+              "required": [
+                "customer_id",
+                "subject",
+                "body",
+                "confirm"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "messages": [
+          {
+            "role": "user",
+            "content": "Find the customer named Zorblax Quimby and give me their email."
+          }
+        ]
+      },
+      "response": {
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Ap8oAZEyYA5y6eAv9XHFm4",
+            "name": "search_customers",
+            "input": {
+              "query": "Zorblax Quimby"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "usage": {
+          "input_tokens": 1384,
+          "output_tokens": 56
+        }
+      }
+    },
+    {
+      "request": {
+        "model": "anthropic/claude-haiku-5.5",
+        "max_tokens": 1024,
+        "system": "You are the operations assistant for Lumen Outdoor Co., a fictional outdoor gear company.\n\nRules:\n- Use the tools for any fact about customers, orders or inventory. Never answer those from memory.\n- Never invent ids, names, dates or numbers. Only report what the tools returned.\n- Call create_ticket only when the user explicitly asks you to open a ticket, and only with confirm=true.\n- If the data you need is missing or a tool fails, say so plainly instead of guessing.\n- Keep answers short and factual.",
+        "tools": [
+          {
+            "name": "search_customers",
+            "description": "Find customers whose name or email contains the query text (case-insensitive). Returns up to `limit` matches (default 10, max 50) and the total match count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Text to match in name or email."
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 10
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_customer",
+            "description": "Get one customer by id (for example C-1001), including the ids of their orders. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "customer_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_order",
+            "description": "Get one order by id (for example O-5001): status, items, total in USD and order date. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "order_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "list_orders",
+            "description": "List orders, optionally filtered by status (placed, shipped, delivered or cancelled). Returns up to `limit` orders (default 20, max 50) and the total count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "placed",
+                    "shipped",
+                    "delivered",
+                    "cancelled"
+                  ]
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 20
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "check_inventory",
+            "description": "Check stock for one SKU (for example LOB-TNT-2P): on-hand units, reorder point and warehouse. Returns found=false for an unknown SKU.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "sku": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sku"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "create_ticket",
+            "description": "Create a support ticket for an existing customer. This writes data: state what you will create, then call with confirm=true.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "confirm": {
+                  "type": "boolean",
+                  "description": "Must be true to perform the write."
+                }
+              },
+              "required": [
+                "customer_id",
+                "subject",
+                "body",
+                "confirm"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "messages": [
+          {
+            "role": "user",
+            "content": "Find the customer named Zorblax Quimby and give me their email."
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "tool_use",
+                "id": "toolu_01Ap8oAZEyYA5y6eAv9XHFm4",
+                "name": "search_customers",
+                "input": {
+                  "query": "Zorblax Quimby"
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "tool_result",
+                "tool_use_id": "toolu_01Ap8oAZEyYA5y6eAv9XHFm4",
+                "content": "{\"ok\": true, \"data\": {\"count\": 0, \"customers\": []}}"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "content": [
+          {
+            "signature": "CAQS0gUKEAgSGAI4AUIIdGhpbmtpbmcSDPo72zpfJjsBSU6I9xoMK25LJoUN+EJWXP98IjAnBh30I+SAHmDgFYL8AYq/9juE5XLcoBxk9oBJkGJ32FxGPHt4xm4iPoPf6IAYG9wq7wTjCNWOEJZRxY0rSNZ6E+n7ZM1ugIOkMaYSo4shVmfI0kL9qPWFeWpibN35bpa3HfFijkkqNcOXtS5ykYv/IlXe02FS4W3hZ6+Dj/0xhJoqNsHDloM/d2edHEtwyHkDdlvJkGSCNaGVNGTuTsZdQ7rmthscAKTgf4lSEq5sylJMC5MLx7EzdO0tnNxDRH/zDYB5+O62tnZyWLGoQmh+hgR6LTR35Kr0vla0taCtdjTUHkUqmOOvmMj2SHs/HKaVRlauGRcFXnUTlMKAvzhQH7TJGq5SkiMcGTbq65fDJW7+nRQsX+AZglPlPew5rxV+f+vUxBPMfDoCnGQ75tTOt9Y7ZmsIExFLP93RAfQq9auQ6WQolWsdeCHHpyGZPCWACxxA4UOVGlm5nJ43sFOWSEOHJeZKmPbrhweZ2IwQGVE7GYt53MXQaZdcUhhr/n0pU3aNKiKvSPnZN5NKCfPCRWvyIsXEKqFUonsP5erGO+NznhrcL+WkF57GTtoUyp5uMTMfUYUVv7AlIG/SpdUBO5k4wkN1WpYh33EfkNsOQpXbVUwxL5u+X/nNuyghaqGpCz6orvou8q5wNcicD9WqU99plsSE3xBNKGd5w5twlr7+N+8aRJFU2cjrf6avg8ATqASuIqL1Vj+8p6xHWGdp7sQTzsKnDh0FwgcBO9TNLXNPKoDJ0Izz3c4aG7JC1aOJLFcNmypEEqMjCsrxjVEsvpovzY/DcsLG099U8q+GvLncWdVtlwQ4zJfNU/+D+aFdQW75cK/KfFZMJPLOqa7zEmiOBAkvGlXiq7AgMDnTUJVOSeb/zZNGhO6oE2p7/8X6ihgB.eyJlbmRwb2ludF9zbHVnIjoiYW50aHJvcGljL2NsYXVkZS1oYWlrdS01LjUtMjAyNjEwMDd8Y2xhdWRlLW9uLWF3cyJ9",
+            "thinking": "",
+            "type": "thinking"
+          },
+          {
+            "type": "tool_use",
+            "id": "toolu_01Wzncy99kptz5zUxpkvq2JG",
+            "name": "search_customers",
+            "input": {
+              "query": "Quimby"
+            }
+          },
+          {
+            "type": "tool_use",
+            "id": "toolu_01YaNScyjnjYMWrLeZdnTvvG",
+            "name": "search_customers",
+            "input": {
+              "query": "Zorblax"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "usage": {
+          "input_tokens": 1469,
+          "output_tokens": 146
+        }
+      }
+    },
+    {
+      "request": {
+        "model": "anthropic/claude-haiku-5.5",
+        "max_tokens": 1024,
+        "system": "You are the operations assistant for Lumen Outdoor Co., a fictional outdoor gear company.\n\nRules:\n- Use the tools for any fact about customers, orders or inventory. Never answer those from memory.\n- Never invent ids, names, dates or numbers. Only report what the tools returned.\n- Call create_ticket only when the user explicitly asks you to open a ticket, and only with confirm=true.\n- If the data you need is missing or a tool fails, say so plainly instead of guessing.\n- Keep answers short and factual.",
+        "tools": [
+          {
+            "name": "search_customers",
+            "description": "Find customers whose name or email contains the query text (case-insensitive). Returns up to `limit` matches (default 10, max 50) and the total match count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Text to match in name or email."
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 10
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_customer",
+            "description": "Get one customer by id (for example C-1001), including the ids of their orders. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "customer_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_order",
+            "description": "Get one order by id (for example O-5001): status, items, total in USD and order date. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "order_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "list_orders",
+            "description": "List orders, optionally filtered by status (placed, shipped, delivered or cancelled). Returns up to `limit` orders (default 20, max 50) and the total count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "placed",
+                    "shipped",
+                    "delivered",
+                    "cancelled"
+                  ]
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 20
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "check_inventory",
+            "description": "Check stock for one SKU (for example LOB-TNT-2P): on-hand units, reorder point and warehouse. Returns found=false for an unknown SKU.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "sku": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sku"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "create_ticket",
+            "description": "Create a support ticket for an existing customer. This writes data: state what you will create, then call with confirm=true.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "confirm": {
+                  "type": "boolean",
+                  "description": "Must be true to perform the write."
+                }
+              },
+              "required": [
+                "customer_id",
+                "subject",
+                "body",
+                "confirm"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "messages": [
+          {
+            "role": "user",
+            "content": "Find the customer named Zorblax Quimby and give me their email."
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "tool_use",
+                "id": "toolu_01Ap8oAZEyYA5y6eAv9XHFm4",
+                "name": "search_customers",
+                "input": {
+                  "query": "Zorblax Quimby"
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "tool_result",
+                "tool_use_id": "toolu_01Ap8oAZEyYA5y6eAv9XHFm4",
+                "content": "{\"ok\": true, \"data\": {\"count\": 0, \"customers\": []}}"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "signature": "CAQS0gUKEAgSGAI4AUIIdGhpbmtpbmcSDPo72zpfJjsBSU6I9xoMK25LJoUN+EJWXP98IjAnBh30I+SAHmDgFYL8AYq/9juE5XLcoBxk9oBJkGJ32FxGPHt4xm4iPoPf6IAYG9wq7wTjCNWOEJZRxY0rSNZ6E+n7ZM1ugIOkMaYSo4shVmfI0kL9qPWFeWpibN35bpa3HfFijkkqNcOXtS5ykYv/IlXe02FS4W3hZ6+Dj/0xhJoqNsHDloM/d2edHEtwyHkDdlvJkGSCNaGVNGTuTsZdQ7rmthscAKTgf4lSEq5sylJMC5MLx7EzdO0tnNxDRH/zDYB5+O62tnZyWLGoQmh+hgR6LTR35Kr0vla0taCtdjTUHkUqmOOvmMj2SHs/HKaVRlauGRcFXnUTlMKAvzhQH7TJGq5SkiMcGTbq65fDJW7+nRQsX+AZglPlPew5rxV+f+vUxBPMfDoCnGQ75tTOt9Y7ZmsIExFLP93RAfQq9auQ6WQolWsdeCHHpyGZPCWACxxA4UOVGlm5nJ43sFOWSEOHJeZKmPbrhweZ2IwQGVE7GYt53MXQaZdcUhhr/n0pU3aNKiKvSPnZN5NKCfPCRWvyIsXEKqFUonsP5erGO+NznhrcL+WkF57GTtoUyp5uMTMfUYUVv7AlIG/SpdUBO5k4wkN1WpYh33EfkNsOQpXbVUwxL5u+X/nNuyghaqGpCz6orvou8q5wNcicD9WqU99plsSE3xBNKGd5w5twlr7+N+8aRJFU2cjrf6avg8ATqASuIqL1Vj+8p6xHWGdp7sQTzsKnDh0FwgcBO9TNLXNPKoDJ0Izz3c4aG7JC1aOJLFcNmypEEqMjCsrxjVEsvpovzY/DcsLG099U8q+GvLncWdVtlwQ4zJfNU/+D+aFdQW75cK/KfFZMJPLOqa7zEmiOBAkvGlXiq7AgMDnTUJVOSeb/zZNGhO6oE2p7/8X6ihgB.eyJlbmRwb2ludF9zbHVnIjoiYW50aHJvcGljL2NsYXVkZS1oYWlrdS01LjUtMjAyNjEwMDd8Y2xhdWRlLW9uLWF3cyJ9",
+                "thinking": "",
+                "type": "thinking"
+              },
+              {
+                "type": "tool_use",
+                "id": "toolu_01Wzncy99kptz5zUxpkvq2JG",
+                "name": "search_customers",
+                "input": {
+                  "query": "Quimby"
+                }
+              },
+              {
+                "type": "tool_use",
+                "id": "toolu_01YaNScyjnjYMWrLeZdnTvvG",
+                "name": "search_customers",
+                "input": {
+                  "query": "Zorblax"
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "tool_result",
+                "tool_use_id": "toolu_01Wzncy99kptz5zUxpkvq2JG",
+                "content": "{\"ok\": true, \"data\": {\"count\": 0, \"customers\": []}}"
+              },
+              {
+                "type": "tool_result",
+                "tool_use_id": "toolu_01YaNScyjnjYMWrLeZdnTvvG",
+                "content": "{\"ok\": true, \"data\": {\"count\": 0, \"customers\": []}}"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "I couldn't find a customer named Zorblax Quimby. I searched for the full name, \"Quimby\" and \"Zorblax\", and none returned a match. I can't give you an email without a matching record. If you have a customer ID or an email address, I can look that up, or you could try a different spelling of the name."
+          }
+        ],
+        "stop_reason": "end_turn",
+        "usage": {
+          "input_tokens": 1721,
+          "output_tokens": 96
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,340 @@
+{
+  "task": "lookup-07",
+  "steps": [
+    {
+      "request": {
+        "model": "anthropic/claude-haiku-5.5",
+        "max_tokens": 1024,
+        "system": "You are the operations assistant for Lumen Outdoor Co., a fictional outdoor gear company.\n\nRules:\n- Use the tools for any fact about customers, orders or inventory. Never answer those from memory.\n- Never invent ids, names, dates or numbers. Only report what the tools returned.\n- Call create_ticket only when the user explicitly asks you to open a ticket, and only with confirm=true.\n- If the data you need is missing or a tool fails, say so plainly instead of guessing.\n- Keep answers short and factual.",
+        "tools": [
+          {
+            "name": "search_customers",
+            "description": "Find customers whose name or email contains the query text (case-insensitive). Returns up to `limit` matches (default 10, max 50) and the total match count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Text to match in name or email."
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 10
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_customer",
+            "description": "Get one customer by id (for example C-1001), including the ids of their orders. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "customer_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_order",
+            "description": "Get one order by id (for example O-5001): status, items, total in USD and order date. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "order_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "list_orders",
+            "description": "List orders, optionally filtered by status (placed, shipped, delivered or cancelled). Returns up to `limit` orders (default 20, max 50) and the total count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "placed",
+                    "shipped",
+                    "delivered",
+                    "cancelled"
+                  ]
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 20
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "check_inventory",
+            "description": "Check stock for one SKU (for example LOB-TNT-2P): on-hand units, reorder point and warehouse. Returns found=false for an unknown SKU.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "sku": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sku"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "create_ticket",
+            "description": "Create a support ticket for an existing customer. This writes data: state what you will create, then call with confirm=true.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "confirm": {
+                  "type": "boolean",
+                  "description": "Must be true to perform the write."
+                }
+              },
+              "required": [
+                "customer_id",
+                "subject",
+                "body",
+                "confirm"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "messages": [
+          {
+            "role": "user",
+            "content": "Which warehouse stocks LOB-STV-1B (single burner stove)?"
+          }
+        ]
+      },
+      "response": {
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01AU8aNmm1nXdVEufBK2EQK3",
+            "name": "check_inventory",
+            "input": {
+              "sku": "LOB-STV-1B"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "usage": {
+          "input_tokens": 1389,
+          "output_tokens": 58
+        }
+      }
+    },
+    {
+      "request": {
+        "model": "anthropic/claude-haiku-5.5",
+        "max_tokens": 1024,
+        "system": "You are the operations assistant for Lumen Outdoor Co., a fictional outdoor gear company.\n\nRules:\n- Use the tools for any fact about customers, orders or inventory. Never answer those from memory.\n- Never invent ids, names, dates or numbers. Only report what the tools returned.\n- Call create_ticket only when the user explicitly asks you to open a ticket, and only with confirm=true.\n- If the data you need is missing or a tool fails, say so plainly instead of guessing.\n- Keep answers short and factual.",
+        "tools": [
+          {
+            "name": "search_customers",
+            "description": "Find customers whose name or email contains the query text (case-insensitive). Returns up to `limit` matches (default 10, max 50) and the total match count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "description": "Text to match in name or email."
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 10
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_customer",
+            "description": "Get one customer by id (for example C-1001), including the ids of their orders. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "customer_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "get_order",
+            "description": "Get one order by id (for example O-5001): status, items, total in USD and order date. Returns found=false for an unknown id.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "order_id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "list_orders",
+            "description": "List orders, optionally filtered by status (placed, shipped, delivered or cancelled). Returns up to `limit` orders (default 20, max 50) and the total count.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "placed",
+                    "shipped",
+                    "delivered",
+                    "cancelled"
+                  ]
+                },
+                "limit": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 50,
+                  "default": 20
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "check_inventory",
+            "description": "Check stock for one SKU (for example LOB-TNT-2P): on-hand units, reorder point and warehouse. Returns found=false for an unknown SKU.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "sku": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sku"
+              ],
+              "additionalProperties": false
+            }
+          },
+          {
+            "name": "create_ticket",
+            "description": "Create a support ticket for an existing customer. This writes data: state what you will create, then call with confirm=true.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "customer_id": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "confirm": {
+                  "type": "boolean",
+                  "description": "Must be true to perform the write."
+                }
+              },
+              "required": [
+                "customer_id",
+                "subject",
+                "body",
+                "confirm"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "messages": [
+          {
+            "role": "user",
+            "content": "Which warehouse stocks LOB-STV-1B (single burner stove)?"
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "tool_use",
+                "id": "toolu_01AU8aNmm1nXdVEufBK2EQK3",
+                "name": "check_inventory",
+                "input": {
+                  "sku": "LOB-STV-1B"
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "tool_result",
+                "tool_use_id": "toolu_01AU8aNmm1nXdVEufBK2EQK3",
+                "content": "{\"ok\": true, \"data\": {\"found\": true, \"item\": {\"sku\": \"LOB-STV-1B\", \"name\": \"Single Burner Stove\", \"on_hand\": 14, \"reorder_point\": 25, \"warehouse\": \"Reno\"}, \"in_stock\": true, \"below_reorder_point\": true}}"
+              }
+            ]
+          }
+        ]
+      },
+      "response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "LOB-STV-1B (Single Burner Stove) is stocked at the Reno warehouse, with 14 units on hand. That is below its reorder point of 25."
+          }
+        ],
+        "stop_reason": "end_turn",
+        "usage": {
+          "input_tokens": 1552,
+          "output_tokens": 56
+        }
+      }
+    }
+  ]
+}
