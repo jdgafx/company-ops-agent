@@ -257,7 +257,10 @@ function inputText(obj) {
 
 function showAnswer(data) {
   const wrap = el("div");
-  wrap.appendChild(el("p", "answer", data.answer));
+  const ansEl = el("p", "answer");
+  // Models sometimes return **bold**; render it as bold text without touching innerHTML.
+  data.answer.split(/\*\*(.+?)\*\*/g).forEach((part, i) => ansEl.appendChild(i % 2 ? el("strong", null, part) : document.createTextNode(part)));
+  wrap.appendChild(ansEl);
   const trace = Array.isArray(data.trace) ? data.trace : [];
   if (trace.length) {
     wrap.appendChild(el("h2", null, "Lookups the agent ran"));
