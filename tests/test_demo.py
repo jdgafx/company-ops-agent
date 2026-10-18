@@ -58,7 +58,12 @@ def build(factory=None):
     from ops_agent.store import Store
 
     factory = factory or Factory()
-    app = create_app(SETTINGS, registry=build_registry(Store("data")), client_factory=factory)
+    app = create_app(
+        SETTINGS,
+        registry=build_registry(Store("data")),
+        client_factory=factory,
+        demo_usage_fetcher=lambda: 0.0,  # SU.1: spend stop never trips in these tests
+    )
     return TestClient(app), factory
 
 
