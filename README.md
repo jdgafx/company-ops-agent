@@ -2,7 +2,11 @@
 
 A tool-using agent over a fictional company data set (Lumen Outdoor Co.). The agent decides which tools to call and in what order. It is served by FastAPI, has its own MCP server, an eval gate that runs in CI, and a Docker image. All data is invented. There is no real client data in this repository.
 
-Live demo: the server holds one demo model key (`OPS_DEMO_PROVIDER_KEY`). Visitors send no key; each question uses that key under the demo limits.
+Live demo: https://company-ops-demo.onrender.com (a question form, with a wake page while the free server starts)
+
+Live API: https://company-ops-agent.onrender.com (`GET /healthz`, `POST /v1/ask`)
+
+The server holds one demo model key (`OPS_DEMO_PROVIDER_KEY`). Visitors send no key; each question uses that key under the demo limits.
 
 ## Architecture
 
