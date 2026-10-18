@@ -10,7 +10,7 @@ from ops_agent.api import create_app
 
 SETTINGS = NS(model="m", max_steps=2, max_tokens=100)
 DEMO_KEY = "sk-demo-SECRETSECRETSECRET"
-BYOK_KEY = "sk-test-AAAAAAAAAAAAAAAA"
+CALLER_KEY = "sk-test-AAAAAAAAAAAAAAAA"
 Q = {"question": "How many open tickets are there?"}
 ENV = (
     "OPS_DEMO_PROVIDER_KEY", "OPS_DEMO_TOTAL_USD", "OPS_DEMO_PER_HOUR_PER_CLIENT",
@@ -84,7 +84,6 @@ def used_up(r):
         r.status_code == 429
         and r.json()["error"] == "demo_budget_used_up"
         and "Retry-After" not in r.headers
-        and "X-Provider-Key" in r.json()["detail"]
     )
 
 
@@ -161,10 +160,9 @@ def test_key_never_in_responses_or_logs(env, caplog):
     assert "RuntimeError" in caplog.text
 
 
-def test_byok_works_when_demo_budget_used_up(env):
+def test_caller_key_does_not_bypass_budget_stop(env):
     clock = Clock()
     c = build(Fetcher(1.0, 50.0), clock)
     clock.t += 61
     assert used_up(c.post("/v1/ask", json=Q))
-    r = c.post("/v1/ask", json=Q, headers={"X-Provider-Key": BYOK_KEY})
-    assert r.status_code == 200
+    assert used_up(c.post("/v1/ask", json=Q, headers={"X-Provider-Key": CALLER_KEY}))

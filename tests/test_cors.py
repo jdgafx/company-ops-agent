@@ -39,18 +39,15 @@ def test_unset_env_means_no_cors_headers(tmp_path):
     assert "access-control-allow-origin" not in r.headers
 
 
-def test_preflight_allows_key_header_for_allowed_origin(tmp_path):
+def test_preflight_allows_json_post_and_refuses_key_header(tmp_path):
     os.environ["OPS_CORS_ORIGINS"] = ALLOWED
-    r = make(tmp_path).options(
-        "/v1/ask",
-        headers={
-            "Origin": ALLOWED,
-            "Access-Control-Request-Method": "POST",
-            "Access-Control-Request-Headers": "content-type,x-provider-key",
-        },
+    base = {"Origin": ALLOWED, "Access-Control-Request-Method": "POST"}
+    ok = make(tmp_path).options("/v1/ask", headers={**base, "Access-Control-Request-Headers": "content-type"})
+    assert ok.status_code == 200 and ok.headers["access-control-allow-origin"] == ALLOWED
+    refused = make(tmp_path).options(
+        "/v1/ask", headers={**base, "Access-Control-Request-Headers": "content-type,x-provider-key"}
     )
-    assert r.status_code == 200
-    assert r.headers["access-control-allow-origin"] == ALLOWED
+    assert refused.status_code == 400
 
 
 def test_wildcard_is_ignored(tmp_path):

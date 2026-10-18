@@ -21,9 +21,6 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("ops_agent.api")
 
-KEY_HEADER = "X-Provider-Key"
-KEY_MIN_LEN, KEY_MAX_LEN = 16, 256
-
 
 class ModelCallError(Exception):
     """A per-request client could not be built or the model call failed. Carries no detail."""
@@ -49,16 +46,6 @@ class _GuardedClient:
         self.messages = _GuardedMessages(inner.messages)
 
 
-def _clean_key(raw: str) -> str | None:
-    """Return the stripped key, or None when its shape is invalid. Never echoes the key."""
-    key = raw.strip()
-    if not KEY_MIN_LEN <= len(key) <= KEY_MAX_LEN:
-        return None
-    if any(c.isspace() or not c.isprintable() for c in key):
-        return None
-    return key
-
-
 class AskRequest(BaseModel):
     question: str = Field(min_length=3, max_length=500)
 
@@ -78,18 +65,9 @@ def client_identity(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-DEMO_HOURLY_DETAIL = (
-    "You have used this demo's free questions for this hour. Try again later, "
-    f"or send your own OpenRouter key in the {KEY_HEADER} header."
-)
-DEMO_DAILY_DETAIL = (
-    "The free demo has reached its daily limit. Try again tomorrow, "
-    f"or send your own OpenRouter key in the {KEY_HEADER} header."
-)
-DEMO_BUDGET_DETAIL = (
-    "The free demo has used its budget for now. Try again later, "
-    f"or send your own OpenRouter key in the {KEY_HEADER} header."
-)
+DEMO_HOURLY_DETAIL = "You have used this demo's free questions for this hour. Try again later."
+DEMO_DAILY_DETAIL = "The free demo has reached its daily limit. Try again tomorrow."
+DEMO_BUDGET_DETAIL = "The free demo has used its budget for now. Try again later."
 
 
 class DemoConfig:
@@ -165,8 +143,8 @@ def create_app(
     `client_factory(api_key) -> client`, `demo_usage_fetcher() -> total USD` and `demo_clock`
     are test injection points.
 
-    BYOK: every /v1/ask call carries the caller's own key in X-Provider-Key. The key
-    builds one client for that request and is dropped; it is never stored or logged.
+    The server holds one model key, OPS_DEMO_PROVIDER_KEY, and every /v1/ask call uses it.
+    Callers send no key. Without that key the API answers 503 `demo_not_configured`.
     """
     if settings is None:
         from ops_agent.config import Settings
@@ -184,7 +162,7 @@ def create_app(
         int(getattr(settings, "max_tokens", 0)) + step_allowance
     )
 
-    # Free demo: a host-held key serves keyless requests. Read once; never returned or logged.
+    # Free demo: the host-held key serves every request. Read once; never returned or logged.
     demo_key = (os.environ.get("OPS_DEMO_PROVIDER_KEY") or "").strip()
     demo = DemoConfig() if demo_key else None
     if demo is not None:
@@ -216,7 +194,7 @@ def create_app(
             CORSMiddleware,
             allow_origins=cors_origins,
             allow_methods=["GET", "POST", "OPTIONS"],
-            allow_headers=["Content-Type", KEY_HEADER],
+            allow_headers=["Content-Type"],
         )
 
     def ask_demo(question: str, ip: str):
@@ -267,23 +245,12 @@ def create_app(
 
     @app.post("/v1/ask")
     def ask(body: AskRequest, request: Request):
-        # Key checks come first: a keyless or malformed request costs and counts nothing.
-        raw_key = request.headers.get(KEY_HEADER, "")
-        ip = client_identity(request)
-        if not raw_key.strip() and demo is not None:
-            return ask_demo(body.question, ip)
-        if not raw_key.strip():
-            return JSONResponse(
-                {
-                    "error": "byok_key_required",
-                    "detail": f"send your own provider key in the {KEY_HEADER} header",
-                },
-                status_code=401,
-            )
-        key = _clean_key(raw_key)
-        if key is None:
-            return JSONResponse({"error": "invalid_key_format"}, status_code=400)
-        allowed, retry_after = limiter.allow(ip)
+        if demo is not None:
+            return ask_demo(body.question, client_identity(request))
+        if runner is None:
+            return JSONResponse({"error": "demo_not_configured"}, status_code=503)
+        # Injected runner (tests only) owns its own model access; the limits still apply.
+        allowed, retry_after = limiter.allow(client_identity(request))
         if not allowed:
             return JSONResponse(
                 {"error": "rate_limited"}, status_code=429, headers={"Retry-After": str(retry_after)}
@@ -291,19 +258,7 @@ def create_app(
         if not daily.reserve(token_estimate):
             return JSONResponse({"error": "daily_cap_reached"}, status_code=429)
         try:
-            if runner is not None:
-                result = run(body.question)  # injected runner owns its own model access
-            else:
-                try:
-                    model_client = _GuardedClient(factory(key))
-                except Exception as exc:  # noqa: BLE001
-                    log.error("client build failed: %s", type(exc).__name__)
-                    raise ModelCallError from None
-                result = run(body.question, model_client)
-                del model_client
-        except ModelCallError:
-            daily.settle(token_estimate, None)  # usage unknown: keep the reservation charged
-            return JSONResponse({"error": "model_call_failed"}, status_code=502)
+            result = run(body.question)
         except Exception as exc:  # noqa: BLE001
             log.error("agent run failed: %s", type(exc).__name__)
             daily.settle(token_estimate, None)  # usage unknown: keep the reservation charged

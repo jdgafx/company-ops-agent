@@ -41,7 +41,7 @@ Do-not-touch: no paid cloud spend; no secrets in git; no change to the 13 existi
 - AWS alternative: Lambda container image + Function URL. App Runner is not free. Check ECR free storage.
 
 ## Eval key and spend
-- Provider: OpenRouter (Anthropic-compatible endpoint), as decided in SM.1. The live key is used only by the local runner (`OPS_AGENT_API_KEY`) for the three live runs. CI holds no key; the server holds no key (BYOK).
+- Provider: OpenRouter (Anthropic-compatible endpoint), as decided in SM.1. The live key is used only by the local runner (`OPS_AGENT_API_KEY`) for the three live runs. CI holds no key; the server holds only the demo key (`OPS_DEMO_PROVIDER_KEY`), and callers send none.
 - Record spend per live eval run (tokens and USD estimate) in the evidence file.
 
 ## Blockers (raised only at deploy, after probing)

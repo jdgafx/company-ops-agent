@@ -63,7 +63,7 @@
   .note { font-size: .9rem; color: #566273; margin: 0; }
   label { display: block; font-weight: 600; margin: 0 0 6px; }
   .hint { font-weight: 400; color: #566273; }
-  textarea, input[type="password"] {
+  textarea {
     display: block;
     width: 100%;
     font: inherit;
@@ -87,7 +87,7 @@
     cursor: pointer;
   }
   button:disabled { background: #8aa7e6; cursor: not-allowed; }
-  textarea:focus-visible, input:focus-visible, button:focus-visible { outline: 3px solid #f2b705; outline-offset: 2px; }
+  textarea:focus-visible, button:focus-visible { outline: 3px solid #f2b705; outline-offset: 2px; }
   #answer {
     margin-top: 16px;
     white-space: pre-wrap;
@@ -117,8 +117,6 @@
       <label for="question">Your question</label>
       <textarea id="question" maxlength="500" required minlength="3"></textarea>
       <p class="count"><span id="count">0</span>/500</p>
-      <label for="key">Your own OpenRouter key <span class="hint">(optional)</span></label>
-      <input id="key" type="password" autocomplete="off" spellcheck="false">
       <button id="submit" type="submit">Ask</button>
     </form>
     <div id="answer" role="status" aria-live="polite"></div>
@@ -136,9 +134,9 @@ const POLL_TIMEOUT_MS = 8000;
 const HOLD_PERCENT = 90;
 
 const ERROR_TEXT = {
-  byok_key_required: "This demo needs your own OpenRouter key for now. Add it above and try again.",
-  demo_hourly_limit: "You have used this demo's free questions for this hour. Try again later, or use your own key.",
-  demo_daily_limit_reached: "The free demo has reached its daily limit. Try tomorrow, or use your own key.",
+  demo_hourly_limit: "You have used this demo's free questions for this hour. Try again later.",
+  demo_daily_limit_reached: "The free demo has reached its daily limit. Try tomorrow.",
+  demo_budget_used_up: "The free demo has used its budget for now. Try again later.",
   rate_limited: "Too many requests. Wait a minute and try again."
 };
 const ERROR_OTHER = "Something went wrong. Try again.";
@@ -208,8 +206,6 @@ async function ask(ev) {
   const question = $("question").value.trim();
   if (question.length < 3) { showAnswer("Please type a question of at least 3 characters.", true); return; }
   const headers = { "Content-Type": "application/json" };
-  const key = $("key").value.trim();
-  if (key) headers["X-Provider-Key"] = key;
   btn.disabled = true;
   showAnswer("Thinking...", false);
   try {

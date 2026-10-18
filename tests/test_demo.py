@@ -12,7 +12,7 @@ from ops_agent.limits import DemoDailyCap
 
 SETTINGS = NS(model="m", max_steps=2, max_tokens=100)
 DEMO_KEY = "sk-demo-SECRETSECRETSECRET"
-BYOK_KEY = "sk-test-AAAAAAAAAAAAAAAA"
+CALLER_KEY = "sk-test-AAAAAAAAAAAAAAAA"
 Q = {"question": "How many open tickets are there?"}
 
 ENV = (
@@ -79,10 +79,10 @@ def test_demo_serves_keyless_with_demo_key(env):
     assert factory.keys == [DEMO_KEY]
 
 
-def test_keyless_without_demo_key_is_401(env):
+def test_no_demo_key_configured_is_503(env):
     c, factory = build()
     r = c.post("/v1/ask", json=Q)
-    assert r.status_code == 401 and r.json()["error"] == "byok_key_required"
+    assert r.status_code == 503 and r.json() == {"error": "demo_not_configured"}
     assert factory.keys == []
 
 
@@ -94,7 +94,6 @@ def test_hourly_limit_per_client(env):
     r = c.post("/v1/ask", json=Q, headers=xff("1.1.1.1"))
     assert r.status_code == 429 and r.json()["error"] == "demo_hourly_limit"
     assert int(r.headers["Retry-After"]) >= 1
-    assert "X-Provider-Key" in r.json()["detail"]
     assert c.post("/v1/ask", json=Q, headers=xff("2.2.2.2")).status_code == 200
 
 
@@ -106,16 +105,6 @@ def test_spoofed_leftmost_forwarded_for_shares_bucket(env):
     r = c.post("/v1/ask", json=Q, headers=xff("9.9.9.2, 5.5.5.5"))
     assert r.status_code == 429 and r.json()["error"] == "demo_hourly_limit"
     assert c.post("/v1/ask", json=Q, headers=xff("9.9.9.1, 6.6.6.6")).status_code == 200
-
-
-def test_per_minute_limiter_uses_same_identity(env):
-    env.setenv("OPS_RATE_LIMIT_PER_MIN", "1")
-    c, _ = build()
-    h = {"X-Provider-Key": BYOK_KEY}
-    assert c.post("/v1/ask", json=Q, headers={**h, **xff("7.7.7.1, 5.5.5.5")}).status_code == 200
-    r = c.post("/v1/ask", json=Q, headers={**h, **xff("7.7.7.2, 5.5.5.5")})
-    assert r.status_code == 429 and r.json()["error"] == "rate_limited"
-    assert c.post("/v1/ask", json=Q, headers={**h, **xff("7.7.7.1, 6.6.6.6")}).status_code == 200
 
 
 def test_daily_request_cap(env):
@@ -192,13 +181,13 @@ def test_demo_key_not_leaked_on_client_failure(env, caplog):
     assert DEMO_KEY not in caplog.text
 
 
-def test_byok_does_not_touch_demo_counters(env, tmp_path):
+def test_caller_key_header_is_ignored(env, tmp_path):
     env.setenv("OPS_DEMO_PROVIDER_KEY", DEMO_KEY)
     c, factory = build()
-    r = c.post("/v1/ask", json=Q, headers={"X-Provider-Key": BYOK_KEY})
+    r = c.post("/v1/ask", json=Q, headers={"X-Provider-Key": CALLER_KEY})
     assert r.status_code == 200
-    assert factory.keys == [BYOK_KEY]
-    assert not (tmp_path / "demo.json").exists()
+    assert factory.keys == [DEMO_KEY]
+    assert json.loads((tmp_path / "demo.json").read_text())["requests"] == 1
 
 
 def test_demo_502_keeps_reservation_charged(env, tmp_path):

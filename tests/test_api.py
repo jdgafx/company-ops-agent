@@ -32,11 +32,8 @@ def make(tmp_path, runner=None, **env):
     return TestClient(app)
 
 
-KEY_HEADERS = {"X-Provider-Key": "test-key-0123456789abcdef"}
-
-
 def ask(c, q="How many open tickets?"):
-    return c.post("/v1/ask", json={"question": q}, headers=KEY_HEADERS)
+    return c.post("/v1/ask", json={"question": q})
 
 
 def test_healthz(tmp_path):
