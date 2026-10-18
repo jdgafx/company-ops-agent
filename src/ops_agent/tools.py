@@ -19,6 +19,8 @@ class ToolSpec:
     input_schema: dict[str, Any]
     fn: Callable[..., dict[str, Any]]
     write: bool = False  # write tools need confirm=true in their arguments
+    # Optional (arguments, data) -> short human-readable summary of a successful result.
+    summarize: Callable[[dict[str, Any], dict[str, Any]], str] | None = None
 
 
 @dataclass
@@ -53,6 +55,19 @@ class ToolRegistry:
             # Class name only: exception text can echo input or internals back to the model.
             return _error("tool_failed", f"{type(exc).__name__} while running {name}")
         return {"ok": True, "data": result}
+
+
+def summarize_result(spec: ToolSpec | None, arguments: dict[str, Any], result: dict[str, Any]) -> str:
+    """One short line describing what a tool call returned, for traces and the UI."""
+    if not result.get("ok"):
+        err = result.get("error") or {}
+        return f"error {err.get('code', 'unknown')}"[:200]
+    if spec is not None and spec.summarize is not None:
+        try:
+            return spec.summarize(arguments, result.get("data") or {})[:200]
+        except Exception:  # noqa: BLE001 - a summary must never break the loop
+            return "ok"
+    return "ok"
 
 
 def _error(code: str, message: str) -> dict[str, Any]:

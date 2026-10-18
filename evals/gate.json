@@ -1,1 +1,1 @@
-{"min_pass_rate": 0.96, "note": "replay baseline: recorded live run 1 replays as 24/25 (0.96). Replay is deterministic, so any drop fails. Live runs: 0.96, 0.96, 1.00 (evals/results-live-run*.json, local). inject-04 always fails in replay."}
+{"min_pass_rate": 0.96, "note": "Replay of the recorded live run 1 on the Online Retail II subset passes 25/25. The threshold stays at 0.96 (24 of 25). Replay is deterministic, so any drop below 24 of 25 fails. Live runs: 25/25, 25/25, 25/25 (evals/results-live-run*.json, local)."}

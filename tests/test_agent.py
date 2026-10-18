@@ -61,7 +61,8 @@ def test_direct_answer_no_tools():
     assert sent["model"] == DEFAULT_MODEL
     assert "temperature" not in sent
     assert {t["name"] for t in sent["tools"]} == {"get_order", "create_ticket"}
-    assert "Lumen Outdoor Co." in sent["system"]
+    assert "Online Retail II" in sent["system"] and "GBP" in sent["system"]
+    assert "stock levels" in sent["system"]  # says what the dataset does not hold
 
 
 def test_two_tool_chain_and_trace():
@@ -83,6 +84,55 @@ def test_two_tool_chain_and_trace():
     last = client.calls[2]["messages"]
     assert last[-1]["content"][0]["tool_use_id"] == "t2"
     assert json.loads(last[-1]["content"][0]["content"])["ok"] is True
+
+
+def test_trace_entries_carry_name_input_ok_summary():
+    reg = make_tools()
+    client = FakeClient(
+        [
+            reply([use("t1", "get_order", id="A1")], "tool_use"),
+            reply([use("t2", "get_order", id="bad")], "tool_use"),
+            reply([text("x")], "end_turn"),
+        ]
+    )
+    out = run_agent("q", tools=reg, client=client, settings=S)
+    first, second = out["trace"]
+    assert (first["name"], first["input"], first["ok"]) == ("get_order", {"id": "A1"}, True)
+    assert first["summary"] == "ok"  # no summarizer registered for this fake tool
+    assert (second["name"], second["ok"], second["summary"]) == (
+        "get_order", False, "error tool_failed")
+    assert first["tool"] == "get_order" and first["arguments"] == {"id": "A1"}  # old keys stay
+
+
+def test_cost_usd_from_pinned_model_prices():
+    client = FakeClient(
+        [
+            reply([use("t1", "get_order", id="A")], "tool_use", 50_000, 0),
+            reply([text("done")], "end_turn", 0, 50_000),
+        ]
+    )
+    out = run_agent("x", tools=make_tools(), client=client, settings=Settings(max_steps=3))
+    # 50k prompt tokens at 0.0000001 plus 50k completion tokens at 0.0000005 USD per token
+    assert out["cost_usd"] == pytest.approx(0.005 + 0.025)
+
+
+def test_cost_usd_is_null_for_unpriced_model_and_never_guessed():
+    client = FakeClient([reply([text("done")], "end_turn", 10, 10)])
+    out = run_agent("x", tools=make_tools(), client=client, settings=Settings(model="other/model"))
+    assert out["cost_usd"] is None
+
+
+def test_prompt_numbers_match_the_data():
+    import pathlib
+
+    from ops_agent.agent import SYSTEM_PROMPT
+    from ops_agent.store import Store
+
+    counts = Store(pathlib.Path(__file__).resolve().parent.parent / "data").counts()
+    for key in ("customers", "orders", "products"):
+        assert str(counts[key]) in SYSTEM_PROMPT, key
+    assert "2011-09-01" in SYSTEM_PROMPT and "2011-11-30" in SYSTEM_PROMPT
+    assert "fictional" not in SYSTEM_PROMPT.lower() and "invented" not in SYSTEM_PROMPT.lower()
 
 
 def test_tool_error_fed_back_and_recovery():

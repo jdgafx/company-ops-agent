@@ -1,14 +1,14 @@
 # PLAN: company-ops-agent (SK.2 showcase project 1)
 
-Goal: a Python agent service. An LLM agent answers and acts on questions about a fictional company's data by calling tools in a loop it decides for itself (no fixed retrieve-then-answer pipeline). Tools live in one shared registry; the agent calls it in process, and the project's own MCP server exposes the same registry to external MCP clients (deviation from the first draft, which had the agent call the MCP server as a client; decided 2026-10-17 to keep the loop simple). The service has a FastAPI API, an eval suite that gates CI, pytest tests, Docker, and a free-tier cloud deploy.
+Goal: a Python agent service. An LLM agent answers and acts on questions about a real public online-retail data set (UCI Online Retail II subset, TB) by calling tools in a loop it decides for itself (no fixed retrieve-then-answer pipeline). Tools live in one shared registry; the agent calls it in process, and the project's own MCP server exposes the same registry to external MCP clients (deviation from the first draft, which had the agent call the MCP server as a client; decided 2026-10-17 to keep the loop simple). The service has a FastAPI API, an eval suite that gates CI, pytest tests, Docker, and a free-tier cloud deploy.
 
 Done = the SK.2 done-when list: public repo URL; CI green including the eval gate; live deploy URL answers; README with diagram and eval table; evidence file reviews/evidence/portfolio-lead-SK2-agent-service.md.
 Do-not-touch: no paid cloud spend; no secrets in git; no change to the 13 existing apps.
 
 ## Data
-- Fictional company "Lumen Outdoor Co." (invented). Files in `data/`: customers.json, orders.json, inventory.json, tickets.json. No real client data.
-- Read tools: search_customers, get_customer, get_order, list_orders(status), check_inventory(sku).
-- Write tool: create_ticket (adds to tickets.json in a copy-on-write store). Write tools are gated: the agent must pass `confirm=true` after it states what it will do; eval checks that writes happen only when asked.
+- Real data (decision TB, 2026-10-18): a subset of UCI "Online Retail II" (Daqing Chen, CC BY 4.0, DOI 10.24432/C5CG6D), window 2011-09-01 to 2011-11-30, 400 customers. Files in `data/`: customers.json, orders.json, products.json, meta.json, tickets.json, SOURCE.md. Built by `scripts/build_dataset.py`. No personal data exists in it and none was added.
+- Read tools: search_customers, get_customer, get_order, list_orders, get_product (no stock levels exist in the data).
+- Write tool: create_ticket (held in memory; data/ is never written). Write tools are gated: the agent must pass `confirm=true`; eval checks that writes happen only when asked.
 
 ## Steps (each with proof)
 1. Scaffold: pyproject, src layout `src/ops_agent/`, .gitignore, .env.example, empty tests dir. Proof: `pip install -e .[dev]` works; `pytest` runs (0 tests, exit 0 with a smoke test).

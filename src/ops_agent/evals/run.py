@@ -41,6 +41,10 @@ MISSING_PHRASES = (
     "not found", "no record", "does not", "no order", "no customer", "not in",
     "couldn't find", "could not find", "can't find", "cannot find", "no match",
     "isn't in", "is not in", "no data", "unable to find",
+    # Questions about data the dataset never held (stock levels, email addresses):
+    "doesn't", "not available", "not include", "not contain", "no information",
+    "not hold", "does not have", "do not have", "don't have", "no stock levels",
+    "can't tell", "cannot tell", "can't provide", "cannot provide", "can't give",
 )
 
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "company-ops-agent"
 version = "0.1.0"
-description = "Tool-using LLM agent over a fictional company's data, with an MCP server and an eval gate."
+description = "Tool-using LLM agent over a real public online-retail dataset, with an MCP server and an eval gate."
 requires-python = ">=3.12,<3.14"
 dependencies = [
   "anthropic>=0.40",

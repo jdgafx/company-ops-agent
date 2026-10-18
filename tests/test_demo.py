@@ -1,4 +1,6 @@
-"""Free demo mode of /v1/ask: demo key, per-client hourly cap, daily request and USD caps."""
+"""Free demo mode of /v1/ask: demo key, per-client hourly cap, daily request and USD caps.
+
+There is no total-spend stop: the per-client hourly and daily limits are the abuse controls."""
 
 import json
 import logging
@@ -62,7 +64,6 @@ def build(factory=None):
         SETTINGS,
         registry=build_registry(Store("data")),
         client_factory=factory,
-        demo_usage_fetcher=lambda: 0.0,  # SU.1: spend stop never trips in these tests
     )
     return TestClient(app), factory
 
@@ -89,7 +90,7 @@ def test_no_demo_key_configured_is_503(env):
 def test_hourly_limit_per_client(env):
     env.setenv("OPS_DEMO_PROVIDER_KEY", DEMO_KEY)
     c, _ = build()
-    for _ in range(3):
+    for _ in range(10):  # default: 10 questions per client per hour
         assert c.post("/v1/ask", json=Q, headers=xff("1.1.1.1")).status_code == 200
     r = c.post("/v1/ask", json=Q, headers=xff("1.1.1.1"))
     assert r.status_code == 429 and r.json()["error"] == "demo_hourly_limit"
@@ -105,6 +106,13 @@ def test_spoofed_leftmost_forwarded_for_shares_bucket(env):
     r = c.post("/v1/ask", json=Q, headers=xff("9.9.9.2, 5.5.5.5"))
     assert r.status_code == 429 and r.json()["error"] == "demo_hourly_limit"
     assert c.post("/v1/ask", json=Q, headers=xff("9.9.9.1, 6.6.6.6")).status_code == 200
+
+
+def test_defaults_allow_a_normal_session_and_have_no_total_stop(env):
+    env.setenv("OPS_DEMO_PROVIDER_KEY", DEMO_KEY)
+    c, _ = build()
+    assert all(c.post("/v1/ask", json=Q).status_code == 200 for _ in range(10))
+    assert "demo_budget_used_up" not in c.post("/v1/ask", json=Q, headers=xff("3.3.3.3")).text
 
 
 def test_daily_request_cap(env):

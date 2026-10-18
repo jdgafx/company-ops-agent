@@ -1,0 +1,35 @@
+{
+  "name": "UCI Online Retail II, subset",
+  "source_url": "https://archive.ics.uci.edu/dataset/502/online+retail+ii",
+  "license": "CC BY 4.0 (attribution: Daqing Chen)",
+  "doi": "10.24432/C5CG6D",
+  "date_pulled": "2026-10-18",
+  "currency": "GBP",
+  "window": {
+    "from": "2011-09-01",
+    "to": "2011-11-30"
+  },
+  "top_n_customers": 400,
+  "examples": [
+    {
+      "task_id": "lookup-04",
+      "question": "Find the product with 'ladies gentlemen' in its description and give me its stock code and its unit price in GBP."
+    },
+    {
+      "task_id": "multi-03",
+      "question": "Which orders did customer 12395 place in the window, not counting cancellations? Give the invoice numbers."
+    },
+    {
+      "task_id": "multi-05",
+      "question": "Outside the United Kingdom, which country placed the most invoiced orders in the window, and how many?"
+    },
+    {
+      "task_id": "lookup-06",
+      "question": "Show me cancellation invoice C565382: which customer is it for, and what is the amount in GBP?"
+    },
+    {
+      "task_id": "multi-04",
+      "question": "Order 565146 contains stock code 21891. What is that product and how many units of it were sold in the window overall?"
+    }
+  ]
+}

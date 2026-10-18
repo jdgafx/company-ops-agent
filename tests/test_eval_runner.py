@@ -32,8 +32,8 @@ def test_scripted_full_suite_passes_and_writes_report(tmp_path):
 
 
 def test_broken_expectation_fails_gate(tmp_path):
-    task = {"id": "x", "question": "Status of O-5002?", "category": "lookup", "scripted": [],
-            "expect": {"tools_called": ["get_order"], "answer_contains": ["delivered"]}}
+    task = {"id": "x", "question": "Status of order 565083?", "category": "lookup", "scripted": [],
+            "expect": {"tools_called": ["get_order"], "answer_contains": ["invoiced"]}}
     tasks = tmp_path / "t.jsonl"
     tasks.write_text(json.dumps(task) + "\n")
     out = tmp_path / "r.json"
@@ -64,6 +64,8 @@ def test_wrote_detection():
 def test_says_missing_phrases():
     assert run.says_missing("Order O-1 was Not Found.")
     assert run.says_missing("There is no customer with that id")
+    assert run.says_missing("The dataset doesn't include email addresses.")
+    assert run.says_missing("Stock levels are not available in this data.")
     assert not run.says_missing("The order is delivered.")
 
 

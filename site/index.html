@@ -1,127 +1,112 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Company Ops Agent demo</title>
+<meta name="color-scheme" content="light dark">
+<title>Company Ops Agent</title>
+<meta name="description" content="Ask questions about a real UK online retailer's invoices, customers and products. An AI agent looks the answers up and shows every step.">
 <style>
-  *, *::before, *::after { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0;
-    padding: 24px 16px;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    line-height: 1.5;
-    color: #1b2430;
-    background: #f4f6f9;
-    overflow-x: hidden;
+  :root {
+    --bg: #eef1f5; --surface: #ffffff; --ink: #0f1b2d; --muted: #4d5b73; --rule: #d3dae4;
+    --accent: #0b6b5a; --accent-ink: #ffffff; --accent-soft: #dff1ec; --warn: #8a4b00; --warn-bg: #fff3dc; --err: #a0221f; --err-bg: #fde8e7;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-  main { max-width: 640px; margin: 0 auto; }
-  h1 { font-size: 1.5rem; margin: 0 0 16px; }
-  .panel {
-    background: #fff;
-    border: 1px solid #d9dfe7;
-    border-radius: 10px;
-    padding: 16px;
-    margin-bottom: 16px;
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b1320; --surface: #121d2e; --ink: #e8eef7; --muted: #9aa9c0; --rule: #26354d;
+      --accent: #4fd1b5; --accent-ink: #06231d; --accent-soft: #123a35; --warn: #f2c26b; --warn-bg: #3a2c10; --err: #ff9b95; --err-bg: #3d1a19;
+    }
   }
+  :root[data-theme="dark"] {
+    --bg: #0b1320; --surface: #121d2e; --ink: #e8eef7; --muted: #9aa9c0; --rule: #26354d;
+    --accent: #4fd1b5; --accent-ink: #06231d; --accent-soft: #123a35; --warn: #f2c26b; --warn-bg: #3a2c10; --err: #ff9b95; --err-bg: #3d1a19;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--sans); }
   [hidden] { display: none !important; }
-  .status { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; }
-  .dot {
-    flex: none;
-    width: 12px; height: 12px; margin-top: 6px;
-    border-radius: 50%;
-    background: #2f6fed;
-    animation: pulse 1.4s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.5); opacity: 0.45; }
-  }
-  .bar {
-    height: 14px;
-    background: #e3e8ef;
-    border-radius: 7px;
-    overflow: hidden;
-  }
-  .fill {
-    height: 100%;
-    width: 0%;
-    border-radius: 7px;
-    background-color: #2f6fed;
-    background-image: linear-gradient(
-      45deg,
-      rgba(255,255,255,.3) 25%, transparent 25%, transparent 50%,
-      rgba(255,255,255,.3) 50%, rgba(255,255,255,.3) 75%, transparent 75%
-    );
-    background-size: 28px 28px;
-    transition: width 0.4s ease;
-  }
-  .elapsed { margin: 8px 0 0; font-size: .9rem; color: #566273; }
-  .note { font-size: .9rem; color: #566273; margin: 0; }
+  main { max-width: 1080px; margin: 0 auto; padding: 32px 16px 24px; }
+  h1 { font: 600 clamp(1.7rem, 4vw, 2.4rem)/1.15 var(--serif); margin: 0 0 10px; letter-spacing: -0.01em; }
+  h2 { font: 600 1.05rem/1.3 var(--sans); margin: 0 0 8px; }
+  p { margin: 0 0 12px; }
+  .lede { max-width: 62ch; font-size: 1.05rem; color: var(--muted); margin-bottom: 24px; }
+  .lede strong { color: var(--ink); font-weight: 600; }
+  .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 20px; }
+  .grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 900px) { .grid { grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); align-items: start; } }
+  .wake { max-width: 560px; margin: 8px auto 0; }
+  .bar { height: 12px; background: var(--rule); border-radius: 6px; overflow: hidden; margin: 12px 0 8px; }
+  .fill { height: 100%; width: 0%; background: var(--accent); border-radius: 6px; transition: width .4s ease; }
+  .small { font-size: .875rem; color: var(--muted); }
+  dl.facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0 0 16px; font-size: .9rem; }
+  dl.facts dt { color: var(--muted); }
+  dl.facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible, textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .chips { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
+  .chip { width: 100%; text-align: left; font: inherit; font-size: .92rem; color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 8px; padding: 9px 12px; cursor: pointer; }
+  .chip:hover { border-color: var(--accent); background: var(--accent-soft); }
   label { display: block; font-weight: 600; margin: 0 0 6px; }
-  .hint { font-weight: 400; color: #566273; }
-  textarea {
-    display: block;
-    width: 100%;
-    font: inherit;
-    padding: 10px;
-    border: 1px solid #b9c2cf;
-    border-radius: 8px;
-    margin-bottom: 14px;
-    background: #fff;
-    color: inherit;
-  }
-  textarea { min-height: 110px; resize: vertical; }
-  .count { font-size: .85rem; color: #566273; margin: -8px 0 14px; text-align: right; }
-  button {
-    font: inherit;
-    font-weight: 600;
-    padding: 10px 18px;
-    border: 0;
-    border-radius: 8px;
-    background: #2f6fed;
-    color: #fff;
-    cursor: pointer;
-  }
-  button:disabled { background: #8aa7e6; cursor: not-allowed; }
-  textarea:focus-visible, button:focus-visible { outline: 3px solid #f2b705; outline-offset: 2px; }
-  #answer {
-    margin-top: 16px;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-  #answer.error { color: #a4161a; }
-  @media (prefers-reduced-motion: reduce) {
-    .dot, .fill { animation: none; }
-    .fill { transition: none; }
-  }
+  textarea { width: 100%; min-height: 84px; resize: vertical; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; }
+  button.primary { font: inherit; font-weight: 600; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 10px 22px; cursor: pointer; min-height: 44px; }
+  button.primary:disabled { opacity: .55; cursor: progress; }
+  .state-empty { color: var(--muted); }
+  .state-empty ol { margin: 8px 0 0; padding-left: 20px; }
+  .answer { font: 1.12rem/1.65 var(--serif); border-left: 4px solid var(--accent); padding: 2px 0 2px 16px; margin: 0 0 20px; max-width: 68ch; white-space: pre-wrap; }
+  .msg { border-radius: 8px; padding: 12px 14px; }
+  .msg.err { background: var(--err-bg); color: var(--err); }
+  .msg.limit { background: var(--warn-bg); color: var(--warn); }
+  .msg strong { display: block; }
+  table.steps { width: 100%; border-collapse: collapse; font-size: .88rem; margin-bottom: 14px; }
+  table.steps th { text-align: left; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--rule); padding: 4px 8px 6px 0; }
+  table.steps td { vertical-align: top; padding: 8px 8px 8px 0; border-bottom: 1px dotted var(--rule); overflow-wrap: anywhere; }
+  table.steps td.n { color: var(--muted); font-variant-numeric: tabular-nums; width: 1.6em; }
+  table.steps td.tool { white-space: nowrap; }
+  code { font: .84rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .badge-bad { color: var(--err); font-weight: 600; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: .88rem; color: var(--muted); font-variant-numeric: tabular-nums; border-top: 1px solid var(--rule); padding-top: 12px; }
+  .meta b { color: var(--ink); font-weight: 600; }
+  footer { max-width: 1080px; margin: 0 auto; padding: 8px 16px 32px; font-size: .8rem; color: var(--muted); }
+  @media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
 </style>
 </head>
 <body>
 <main>
-  <h1>Company Ops Agent demo</h1>
+  <h1>Company Ops Agent</h1>
+  <p class="lede">An AI agent that answers questions about a <strong>real UK online gift-ware retailer</strong>: its invoices, customers and products. Click an example or type your own question. You get the answer, the data lookups behind it, and how long and how much it cost.</p>
 
-  <section id="wake" class="panel" aria-live="polite">
-    <p class="status"><span class="dot" aria-hidden="true"></span><span id="wakeText">Waking the demo server. This usually takes about 35 seconds on the free tier.</span></p>
-    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar">
-      <div class="fill" id="fill"></div>
-    </div>
-    <p class="elapsed">Elapsed: <span id="elapsed">0</span> s. Usual wait: 31 to 33 s. Server checks: <span id="checks">0</span>.</p>
+  <section id="wake" class="panel wake" aria-live="polite">
+    <h2 id="wakeTitle">Starting the demo server</h2>
+    <p id="wakeText" class="small">The free server sleeps when idle. Waking it takes about 35 seconds.</p>
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar"><div class="fill" id="fill"></div></div>
+    <p class="small">Elapsed: <span id="elapsed">0</span> s. Usual wait: 31 to 33 s. Server checks: <span id="checks">0</span>.</p>
   </section>
 
-  <section id="demo" class="panel" hidden>
-    <form id="form" autocomplete="off">
-      <label for="question">Your question</label>
-      <textarea id="question" maxlength="500" required minlength="3"></textarea>
-      <p class="count"><span id="count">0</span>/500</p>
-      <button id="submit" type="submit">Ask</button>
-    </form>
-    <div id="answer" role="status" aria-live="polite"></div>
-  </section>
+  <div id="app" class="grid" hidden>
+    <section class="panel" aria-labelledby="askTitle">
+      <h2 id="askTitle">What it knows</h2>
+      <dl class="facts" id="facts"><dt>Data</dt><dd>Online Retail II, a real UK retailer's transactions</dd></dl>
+      <h2 id="exTitle" hidden>Try one of these</h2>
+      <ul class="chips" id="chips" aria-labelledby="exTitle"></ul>
+      <form id="form" autocomplete="off">
+        <label for="question">Or ask your own</label>
+        <textarea id="question" maxlength="500" minlength="3" required placeholder="For example: which country placed the most orders?"></textarea>
+        <div class="row"><span class="small"><span id="count">0</span>/500</span><button id="submit" class="primary" type="submit">Ask the agent</button></div>
+      </form>
+    </section>
 
-  <p class="note">The demo runs on Render's free tier. It sleeps after 15 minutes idle; the first visit after that waits about 35 seconds.</p>
+    <section class="panel" aria-labelledby="ansTitle" aria-live="polite">
+      <h2 id="ansTitle">Answer</h2>
+      <div id="result" class="state-empty">
+        <p>Nothing asked yet. Pick an example on the left or type a question. Then you will see:</p>
+        <ol><li>The agent's answer.</li><li>Each lookup it ran in the data, with what came back.</li><li>Time taken, tokens used and cost.</li></ol>
+      </div>
+    </section>
+  </div>
 </main>
+<footer>Runs on Render's free tier; the server may need about 35 seconds to wake after idle time. <span id="credit"></span></footer>
 
 <script>
 "use strict";
@@ -129,18 +114,22 @@ const API_BASE = "https://company-ops-agent.onrender.com";
 const EXPECTED_WAKE_SECONDS = 35;
 const POLL_MS = 2000;
 const POLL_TIMEOUT_MS = 8000;
+const ASK_TIMEOUT_MS = 90000;
 const HOLD_PERCENT = 90;
 
-const ERROR_TEXT = {
-  demo_hourly_limit: "You have used this demo's free questions for this hour. Try again later.",
-  demo_daily_limit_reached: "The free demo has reached its daily limit. Try tomorrow.",
-  demo_budget_used_up: "The free demo has used its budget for now. Try again later.",
-  rate_limited: "Too many requests. Wait a minute and try again."
+const LIMIT_TEXT = {
+  demo_hourly_limit: "You have used this demo's questions for this hour. Try again in a while.",
+  demo_daily_limit_reached: "The demo has reached its daily limit. Try again tomorrow.",
+  daily_cap_reached: "The demo has reached its daily limit. Try again tomorrow.",
+  rate_limited: "Too many requests at once. Wait a minute and try again."
 };
-const ERROR_OTHER = "Something went wrong. Try again.";
-const ERROR_NETWORK = "Could not reach the demo server. Try again in a minute.";
+const ERROR_OTHER = "The agent could not answer this time. Try the question again, or pick an example.";
+const ERROR_NETWORK = "Could not reach the demo server. Check your connection, then try again in a minute.";
 
 const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+
+/* ---- wake: progress follows real elapsed time and real /healthz checks ---- */
 const STARTED_KEY = "wakeStartedAt";
 const MAX_RESUME_MS = 5 * 60 * 1000;
 // A reload during the wait keeps the clock: the bar must never restart from zero.
@@ -156,8 +145,6 @@ const startedAt = (() => {
 let ready = false;
 let checks = 0;
 
-function elapsedSeconds() { return (Date.now() - startedAt) / 1000; }
-
 function setProgress(pct) {
   $("fill").style.width = pct + "%";
   $("bar").setAttribute("aria-valuenow", String(Math.round(pct)));
@@ -165,7 +152,7 @@ function setProgress(pct) {
 
 function tick() {
   if (ready) return;
-  const secs = elapsedSeconds();
+  const secs = (Date.now() - startedAt) / 1000;
   $("elapsed").textContent = String(Math.floor(secs));
   // Linear to HOLD_PERCENT over the measured wait, then a slow creep that never reaches 100.
   // 100 is set only when /healthz answers 200, so the bar cannot finish or restart while waiting.
@@ -174,20 +161,14 @@ function tick() {
     ? HOLD_PERCENT * (secs / EXPECTED_WAKE_SECONDS)
     : HOLD_PERCENT + 8 * (1 - Math.exp(-late / EXPECTED_WAKE_SECONDS));
   setProgress(pct);
-  if (late > 0) {
-    $("wakeText").textContent = "Taking longer than the usual wait. The server is still starting; this page keeps checking.";
-  }
+  if (late > 0) $("wakeText").textContent = "Taking longer than the usual wait. The server is still starting; this page keeps checking.";
 }
 
-function showDemo() {
+function showApp() {
   ready = true;
   try { sessionStorage.removeItem(STARTED_KEY); } catch (e) { /* ignore */ }
   setProgress(100);
-  setTimeout(() => {
-    $("wake").hidden = true;
-    $("demo").hidden = false;
-    $("question").focus();
-  }, 400);
+  setTimeout(() => { $("wake").hidden = true; $("app").hidden = false; loadAbout(); $("question").focus({ preventScroll: true }); }, 400);
 }
 
 async function pollOnce() {
@@ -198,57 +179,151 @@ async function pollOnce() {
   try {
     const res = await fetch(API_BASE + "/healthz", { method: "GET", cache: "no-store", signal: ctrl.signal });
     return res.status === 200;
-  } catch (e) {
-    return false;
-  } finally {
-    clearTimeout(timer);
-  }
+  } catch (e) { return false; } finally { clearTimeout(timer); }
 }
 
 async function pollLoop() {
   while (!ready) {
-    if (await pollOnce()) { showDemo(); return; }
+    if (await pollOnce()) { showApp(); return; }
     await new Promise((r) => setTimeout(r, POLL_MS));
   }
 }
 
-function showAnswer(text, isError) {
-  const el = $("answer");
-  el.textContent = text;
-  el.className = isError ? "error" : "";
+/* ---- what the agent knows ---- */
+const fmt = (n) => (typeof n === "number" ? n.toLocaleString("en-GB") : String(n));
+
+async function loadAbout() {
+  try {
+    const res = await fetch(API_BASE + "/v1/about", { cache: "no-store" });
+    if (!res.ok) return;
+    const a = await res.json();
+    const d = a.dataset || {};
+    const facts = $("facts");
+    facts.textContent = "";
+    const add = (k, v) => { if (v) { facts.appendChild(el("dt", null, k)); facts.appendChild(el("dd", null, v)); } };
+    add("Data", d.name ? d.name + ", a real UK online retailer" : "");
+    if (d.window) add("Period", d.window.from + " to " + d.window.to);
+    if (d.counts) add("Size", fmt(d.counts.orders) + " orders, " + fmt(d.counts.customers) + " customers, " + fmt(d.counts.products) + " products");
+    add("Currency", d.currency || "");
+    if (a.model) add("Model", a.model);
+    const chips = $("chips");
+    chips.textContent = "";
+    (a.examples || []).slice(0, 5).forEach((q) => {
+      const li = el("li");
+      const b = el("button", "chip", q);
+      b.type = "button";
+      b.addEventListener("click", () => { $("question").value = q; $("count").textContent = String(q.length); submitQuestion(q); });
+      li.appendChild(b);
+      chips.appendChild(li);
+    });
+    $("exTitle").hidden = !(a.examples || []).length;
+    if (d.source_url) {
+      const c = $("credit");
+      c.textContent = "Data: ";
+      const link = el("a", null, d.name || "source");
+      link.href = d.source_url; link.rel = "noopener";
+      c.appendChild(link);
+      c.appendChild(document.createTextNode(", " + (d.license || "") + (d.date_pulled ? ", pulled " + d.date_pulled : "") + "."));
+    }
+  } catch (e) { /* the page still works without the about panel */ }
 }
 
-async function ask(ev) {
-  ev.preventDefault();
-  const btn = $("submit");
-  if (btn.disabled) return;
-  const question = $("question").value.trim();
-  if (question.length < 3) { showAnswer("Please type a question of at least 3 characters.", true); return; }
-  const headers = { "Content-Type": "application/json" };
-  btn.disabled = true;
-  showAnswer("Thinking...", false);
-  try {
-    const res = await fetch(API_BASE + "/v1/ask", {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify({ question: question })
+/* ---- asking ---- */
+let busy = false;
+let loadTimer = null;
+
+function setResult(node) { const r = $("result"); r.className = ""; r.textContent = ""; r.appendChild(node); }
+
+function showLoading(question) {
+  const wrap = el("div");
+  wrap.appendChild(el("p", "small", "Question: " + question));
+  const status = el("p", null, "The agent is looking this up in the data. Elapsed: 0 s.");
+  wrap.appendChild(status);
+  setResult(wrap);
+  const t0 = Date.now();
+  loadTimer = setInterval(() => { status.textContent = "The agent is looking this up in the data. Elapsed: " + Math.floor((Date.now() - t0) / 1000) + " s."; }, 500);
+}
+
+function showMessage(kind, title, text) {
+  const m = el("div", "msg " + kind);
+  m.appendChild(el("strong", null, title));
+  m.appendChild(document.createTextNode(text));
+  setResult(m);
+}
+
+function inputText(obj) {
+  try { return Object.entries(obj || {}).map(([k, v]) => k + "=" + (typeof v === "string" ? v : JSON.stringify(v))).join(", "); } catch (e) { return ""; }
+}
+
+function showAnswer(data) {
+  const wrap = el("div");
+  wrap.appendChild(el("p", "answer", data.answer));
+  const trace = Array.isArray(data.trace) ? data.trace : [];
+  if (trace.length) {
+    wrap.appendChild(el("h2", null, "Lookups the agent ran"));
+    const table = el("table", "steps");
+    const head = el("tr");
+    ["", "Tool", "Asked for", "Came back"].forEach((h) => head.appendChild(el("th", null, h)));
+    const thead = el("thead"); thead.appendChild(head); table.appendChild(thead);
+    const body = el("tbody");
+    trace.forEach((s, i) => {
+      const tr = el("tr");
+      tr.appendChild(el("td", "n", String(i + 1)));
+      const tool = el("td", "tool"); tool.appendChild(el("code", null, String(s.name || ""))); tr.appendChild(tool);
+      const inp = el("td"); inp.appendChild(el("code", null, inputText(s.input))); tr.appendChild(inp);
+      const out = el("td");
+      if (s.ok === false) out.appendChild(el("span", "badge-bad", "Failed: "));
+      out.appendChild(document.createTextNode(String(s.summary || (s.ok === false ? "error" : "ok"))));
+      tr.appendChild(out);
+      body.appendChild(tr);
     });
+    table.appendChild(body);
+    wrap.appendChild(table);
+  } else {
+    wrap.appendChild(el("p", "small", "The agent answered without looking anything up in the data."));
+  }
+  const meta = el("div", "meta");
+  const add = (k, v) => { const s = el("span"); s.appendChild(document.createTextNode(k + " ")); s.appendChild(el("b", null, v)); meta.appendChild(s); };
+  if (typeof data.latency_ms === "number") add("Time", (data.latency_ms / 1000).toFixed(1) + " s");
+  if (data.usage) add("Tokens", fmt((data.usage.input_tokens || 0) + (data.usage.output_tokens || 0)));
+  add("Cost", typeof data.cost_usd === "number" ? "US$" + data.cost_usd.toFixed(4) : "not available");
+  if (typeof data.steps === "number") add("Agent steps", String(data.steps));
+  wrap.appendChild(meta);
+  setResult(wrap);
+}
+
+async function submitQuestion(q) {
+  if (busy) return;
+  const question = q.trim();
+  if (question.length < 3) { showMessage("err", "Question too short", "Type at least 3 characters, or pick an example."); return; }
+  busy = true;
+  $("submit").disabled = true;
+  showLoading(question);
+  $("result").scrollIntoView({ block: "nearest", behavior: "smooth" });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ASK_TIMEOUT_MS);
+  try {
+    const res = await fetch(API_BASE + "/v1/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }), signal: ctrl.signal });
     let data = null;
     try { data = await res.json(); } catch (e) { data = null; }
     if (res.ok && data && typeof data.answer === "string") {
-      showAnswer(data.answer, false);
+      showAnswer(data);
     } else {
       const code = data && typeof data.error === "string" ? data.error : "";
-      showAnswer(Object.prototype.hasOwnProperty.call(ERROR_TEXT, code) ? ERROR_TEXT[code] : ERROR_OTHER, true);
+      if (Object.prototype.hasOwnProperty.call(LIMIT_TEXT, code)) showMessage("limit", "Demo limit reached", LIMIT_TEXT[code]);
+      else showMessage("err", "No answer", ERROR_OTHER);
     }
   } catch (e) {
-    showAnswer(ERROR_NETWORK, true);
+    showMessage("err", "Connection problem", ERROR_NETWORK);
   } finally {
-    btn.disabled = false;
+    clearTimeout(timer);
+    clearInterval(loadTimer);
+    busy = false;
+    $("submit").disabled = false;
   }
 }
 
-$("form").addEventListener("submit", ask);
+$("form").addEventListener("submit", (ev) => { ev.preventDefault(); submitQuestion($("question").value); });
 $("question").addEventListener("input", () => { $("count").textContent = String($("question").value.length); });
 setInterval(tick, 250);
 tick();

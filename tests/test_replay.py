@@ -62,8 +62,8 @@ def test_recording_has_no_key_and_fixed_ticket_clock(tasks, tmp_path, monkeypatc
 
 def test_sdk_blocks_normalise_like_replayed_blocks(tmp_path):
     """A live client returns SDK model objects; the recording must still replay cleanly."""
-    task = {"id": "sdk-01", "question": "Which city does C-1001 live in?", "category": "lookup",
-            "expect": {"tools_called": ["get_customer"], "answer_contains": ["Denver"]}}
+    task = {"id": "sdk-01", "question": "Which country is customer 12748 in?", "category": "lookup",
+            "expect": {"tools_called": ["get_customer"], "answer_contains": ["United Kingdom"]}}
     usage = NS(input_tokens=5, output_tokens=2)
 
     class Live:
@@ -73,10 +73,10 @@ def test_sdk_blocks_normalise_like_replayed_blocks(tmp_path):
         def create(self, **kwargs):
             if len(kwargs["messages"]) == 1:
                 block = anthropic.types.ToolUseBlock(
-                    id="tu_1", name="get_customer", input={"customer_id": "C-1001"},
+                    id="tu_1", name="get_customer", input={"customer_id": "12748"},
                     type="tool_use")
                 return NS(content=[block], stop_reason="tool_use", usage=usage)
-            block = anthropic.types.TextBlock(text="Denver", type="text", citations=None)
+            block = anthropic.types.TextBlock(text="United Kingdom", type="text", citations=None)
             return NS(content=[block], stop_reason="end_turn", usage=usage)
 
     rec = tmp_path / "rec"
@@ -87,7 +87,7 @@ def test_sdk_blocks_normalise_like_replayed_blocks(tmp_path):
 def test_changed_tool_output_fails_only_that_task(tasks, recorded, monkeypatch):
     monkeypatch.setattr(
         Store, "get_customer",
-        lambda self, customer_id: {"found": True, "customer": {"id": customer_id, "city": "Oslo"}},
+        lambda self, customer_id: {"found": True, "customer": {"id": customer_id, "country": "Norway"}},
     )
     res = replay(tasks, recorded)
     assert res["write-01"]["passed"]
@@ -213,5 +213,5 @@ def test_store_clock_is_injectable(tmp_path):
     from datetime import UTC, datetime
     fixed = datetime(2030, 5, 6, 7, 8, 9, tzinfo=UTC)
     store = Store(ROOT / "data", tickets_path=tmp_path / "t.json", clock=lambda: fixed)
-    ticket = store.create_ticket("C-1001", "s", "b")["ticket"]
+    ticket = store.create_ticket("12748", "s", "b")["ticket"]
     assert ticket["created_at"] == "2030-05-06T07:08:09+00:00" and ticket["id"] == "T-9001"
