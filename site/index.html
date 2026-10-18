@@ -55,10 +55,8 @@
       rgba(255,255,255,.3) 50%, rgba(255,255,255,.3) 75%, transparent 75%
     );
     background-size: 28px 28px;
-    animation: stripe 0.8s linear infinite;
     transition: width 0.4s ease;
   }
-  @keyframes stripe { to { background-position: 28px 0; } }
   .elapsed { margin: 8px 0 0; font-size: .9rem; color: #566273; }
   .note { font-size: .9rem; color: #566273; margin: 0; }
   label { display: block; font-weight: 600; margin: 0 0 6px; }
@@ -109,7 +107,7 @@
     <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar">
       <div class="fill" id="fill"></div>
     </div>
-    <p class="elapsed">Elapsed: <span id="elapsed">0</span> s</p>
+    <p class="elapsed">Elapsed: <span id="elapsed">0</span> s. Usual wait: 31 to 33 s. Server checks: <span id="checks">0</span>.</p>
   </section>
 
   <section id="demo" class="panel" hidden>
@@ -143,8 +141,20 @@ const ERROR_OTHER = "Something went wrong. Try again.";
 const ERROR_NETWORK = "Could not reach the demo server. Try again in a minute.";
 
 const $ = (id) => document.getElementById(id);
-const startedAt = Date.now();
+const STARTED_KEY = "wakeStartedAt";
+const MAX_RESUME_MS = 5 * 60 * 1000;
+// A reload during the wait keeps the clock: the bar must never restart from zero.
+const startedAt = (() => {
+  const now = Date.now();
+  try {
+    const prev = Number(sessionStorage.getItem(STARTED_KEY));
+    if (prev > 0 && now - prev < MAX_RESUME_MS) return prev;
+    sessionStorage.setItem(STARTED_KEY, String(now));
+  } catch (e) { /* storage blocked: start the clock now */ }
+  return now;
+})();
 let ready = false;
+let checks = 0;
 
 function elapsedSeconds() { return (Date.now() - startedAt) / 1000; }
 
@@ -157,14 +167,21 @@ function tick() {
   if (ready) return;
   const secs = elapsedSeconds();
   $("elapsed").textContent = String(Math.floor(secs));
-  setProgress(HOLD_PERCENT * Math.min(secs / EXPECTED_WAKE_SECONDS, 1));
-  if (secs >= EXPECTED_WAKE_SECONDS) {
-    $("wakeText").textContent = "Still waking up. Thanks for waiting.";
+  // Linear to HOLD_PERCENT over the measured wait, then a slow creep that never reaches 100.
+  // 100 is set only when /healthz answers 200, so the bar cannot finish or restart while waiting.
+  const late = secs - EXPECTED_WAKE_SECONDS;
+  const pct = late <= 0
+    ? HOLD_PERCENT * (secs / EXPECTED_WAKE_SECONDS)
+    : HOLD_PERCENT + 8 * (1 - Math.exp(-late / EXPECTED_WAKE_SECONDS));
+  setProgress(pct);
+  if (late > 0) {
+    $("wakeText").textContent = "Taking longer than the usual wait. The server is still starting; this page keeps checking.";
   }
 }
 
 function showDemo() {
   ready = true;
+  try { sessionStorage.removeItem(STARTED_KEY); } catch (e) { /* ignore */ }
   setProgress(100);
   setTimeout(() => {
     $("wake").hidden = true;
@@ -174,6 +191,8 @@ function showDemo() {
 }
 
 async function pollOnce() {
+  checks += 1;
+  $("checks").textContent = String(checks);
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), POLL_TIMEOUT_MS);
   try {
