@@ -9,6 +9,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
@@ -189,6 +190,20 @@ def create_app(
         )
 
     app = FastAPI(title="company-ops-agent")
+
+    # CORS for the static wake page: exact origins from OPS_CORS_ORIGINS, none by default.
+    cors_origins = [
+        o.strip().rstrip("/")
+        for o in os.environ.get("OPS_CORS_ORIGINS", "").split(",")
+        if o.strip() and o.strip() != "*"
+    ]
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_methods=["GET", "POST", "OPTIONS"],
+            allow_headers=["Content-Type", KEY_HEADER],
+        )
 
     def ask_demo(question: str, ip: str):
         allowed, retry_after = demo_limiter.allow(ip)

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Company Ops Agent demo</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    padding: 24px 16px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    color: #1b2430;
+    background: #f4f6f9;
+    overflow-x: hidden;
+  }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 16px; }
+  .panel {
+    background: #fff;
+    border: 1px solid #d9dfe7;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  [hidden] { display: none !important; }
+  .status { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; }
+  .dot {
+    flex: none;
+    width: 12px; height: 12px; margin-top: 6px;
+    border-radius: 50%;
+    background: #2f6fed;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.5); opacity: 0.45; }
+  }
+  .bar {
+    height: 14px;
+    background: #e3e8ef;
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 7px;
+    background-color: #2f6fed;
+    background-image: linear-gradient(
+      45deg,
+      rgba(255,255,255,.3) 25%, transparent 25%, transparent 50%,
+      rgba(255,255,255,.3) 50%, rgba(255,255,255,.3) 75%, transparent 75%
+    );
+    background-size: 28px 28px;
+    animation: stripe 0.8s linear infinite;
+    transition: width 0.4s ease;
+  }
+  @keyframes stripe { to { background-position: 28px 0; } }
+  .elapsed { margin: 8px 0 0; font-size: .9rem; color: #566273; }
+  .note { font-size: .9rem; color: #566273; margin: 0; }
+  label { display: block; font-weight: 600; margin: 0 0 6px; }
+  .hint { font-weight: 400; color: #566273; }
+  textarea, input[type="password"] {
+    display: block;
+    width: 100%;
+    font: inherit;
+    padding: 10px;
+    border: 1px solid #b9c2cf;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    background: #fff;
+    color: inherit;
+  }
+  textarea { min-height: 110px; resize: vertical; }
+  .count { font-size: .85rem; color: #566273; margin: -8px 0 14px; text-align: right; }
+  button {
+    font: inherit;
+    font-weight: 600;
+    padding: 10px 18px;
+    border: 0;
+    border-radius: 8px;
+    background: #2f6fed;
+    color: #fff;
+    cursor: pointer;
+  }
+  button:disabled { background: #8aa7e6; cursor: not-allowed; }
+  textarea:focus-visible, input:focus-visible, button:focus-visible { outline: 3px solid #f2b705; outline-offset: 2px; }
+  #answer {
+    margin-top: 16px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  #answer.error { color: #a4161a; }
+  @media (prefers-reduced-motion: reduce) {
+    .dot, .fill { animation: none; }
+    .fill { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Company Ops Agent demo</h1>
+
+  <section id="wake" class="panel" aria-live="polite">
+    <p class="status"><span class="dot" aria-hidden="true"></span><span id="wakeText">Waking the demo server. This usually takes about 60 seconds on the free tier.</span></p>
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar">
+      <div class="fill" id="fill"></div>
+    </div>
+    <p class="elapsed">Elapsed: <span id="elapsed">0</span> s</p>
+  </section>
+
+  <section id="demo" class="panel" hidden>
+    <form id="form" autocomplete="off">
+      <label for="question">Your question</label>
+      <textarea id="question" maxlength="500" required minlength="3"></textarea>
+      <p class="count"><span id="count">0</span>/500</p>
+      <label for="key">Your own OpenRouter key <span class="hint">(optional)</span></label>
+      <input id="key" type="password" autocomplete="off" spellcheck="false">
+      <button id="submit" type="submit">Ask</button>
+    </form>
+    <div id="answer" role="status" aria-live="polite"></div>
+  </section>
+
+  <p class="note">The demo runs on Render's free tier. It sleeps after 15 minutes idle; the first visit after that takes about a minute.</p>
+</main>
+
+<script>
+"use strict";
+const API_BASE = "https://company-ops-agent.onrender.com";
+const EXPECTED_WAKE_SECONDS = 60;
+const POLL_MS = 2000;
+const POLL_TIMEOUT_MS = 8000;
+const HOLD_PERCENT = 90;
+
+const ERROR_TEXT = {
+  byok_key_required: "This demo needs your own OpenRouter key for now. Add it above and try again.",
+  demo_hourly_limit: "You have used this demo's free questions for this hour. Try again later, or use your own key.",
+  demo_daily_limit_reached: "The free demo has reached its daily limit. Try tomorrow, or use your own key.",
+  rate_limited: "Too many requests. Wait a minute and try again."
+};
+const ERROR_OTHER = "Something went wrong. Try again.";
+const ERROR_NETWORK = "Could not reach the demo server. Try again in a minute.";
+
+const $ = (id) => document.getElementById(id);
+const startedAt = Date.now();
+let ready = false;
+
+function elapsedSeconds() { return (Date.now() - startedAt) / 1000; }
+
+function setProgress(pct) {
+  $("fill").style.width = pct + "%";
+  $("bar").setAttribute("aria-valuenow", String(Math.round(pct)));
+}
+
+function tick() {
+  if (ready) return;
+  const secs = elapsedSeconds();
+  $("elapsed").textContent = String(Math.floor(secs));
+  setProgress(HOLD_PERCENT * Math.min(secs / EXPECTED_WAKE_SECONDS, 1));
+  if (secs >= EXPECTED_WAKE_SECONDS) {
+    $("wakeText").textContent = "Still waking up. Thanks for waiting.";
+  }
+}
+
+function showDemo() {
+  ready = true;
+  setProgress(100);
+  setTimeout(() => {
+    $("wake").hidden = true;
+    $("demo").hidden = false;
+    $("question").focus();
+  }, 400);
+}
+
+async function pollOnce() {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), POLL_TIMEOUT_MS);
+  try {
+    const res = await fetch(API_BASE + "/healthz", { method: "GET", cache: "no-store", signal: ctrl.signal });
+    return res.status === 200;
+  } catch (e) {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function pollLoop() {
+  while (!ready) {
+    if (await pollOnce()) { showDemo(); return; }
+    await new Promise((r) => setTimeout(r, POLL_MS));
+  }
+}
+
+function showAnswer(text, isError) {
+  const el = $("answer");
+  el.textContent = text;
+  el.className = isError ? "error" : "";
+}
+
+async function ask(ev) {
+  ev.preventDefault();
+  const btn = $("submit");
+  if (btn.disabled) return;
+  const question = $("question").value.trim();
+  if (question.length < 3) { showAnswer("Please type a question of at least 3 characters.", true); return; }
+  const headers = { "Content-Type": "application/json" };
+  const key = $("key").value.trim();
+  if (key) headers["X-Provider-Key"] = key;
+  btn.disabled = true;
+  showAnswer("Thinking...", false);
+  try {
+    const res = await fetch(API_BASE + "/v1/ask", {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify({ question: question })
+    });
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (res.ok && data && typeof data.answer === "string") {
+      showAnswer(data.answer, false);
+    } else {
+      const code = data && typeof data.error === "string" ? data.error : "";
+      showAnswer(Object.prototype.hasOwnProperty.call(ERROR_TEXT, code) ? ERROR_TEXT[code] : ERROR_OTHER, true);
+    }
+  } catch (e) {
+    showAnswer(ERROR_NETWORK, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$("form").addEventListener("submit", ask);
+$("question").addEventListener("input", () => { $("count").textContent = String($("question").value.length); });
+setInterval(tick, 250);
+tick();
+pollLoop();
+</script>
+</body>
+</html>
