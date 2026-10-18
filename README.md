@@ -8,6 +8,15 @@ Live API: https://company-ops-agent.onrender.com (`GET /healthz`, `POST /v1/ask`
 
 The server holds one demo model key (`OPS_DEMO_PROVIDER_KEY`). Visitors send no key; each question uses that key under the demo limits.
 
+## Hosting on Render (free tier)
+
+The API (`company-ops-agent`) is a Render free web service and the question page (`company-ops-demo`) is a Render static site. Render's free web services sleep after 15 minutes without traffic, so the first request after a sleep has to wait for a cold start.
+
+- Measured cold start (2026-10-18, three samples on the same deploy): 32.3 s, 32.4 s and 31.4 s for the first `GET /healthz`. Warm requests answer in about 0.15 to 0.35 s.
+- The wake page shows an animated progress bar and the elapsed seconds, based on the measured wait of about 35 s. It checks `/healthz` every 2 seconds and switches to the question form when the API answers.
+- `.github/workflows/keepalive.yml` pings `/healthz` every 10 minutes so the service rarely sleeps. The wake page is the fallback when it does.
+- Demo limits: 3 questions per client per hour, 20 per day, US$0.10 per day, and a US$1.00 total stop measured from the demo key's own usage.
+
 ## Architecture
 
 ```mermaid

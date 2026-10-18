@@ -105,7 +105,7 @@
   <h1>Company Ops Agent demo</h1>
 
   <section id="wake" class="panel" aria-live="polite">
-    <p class="status"><span class="dot" aria-hidden="true"></span><span id="wakeText">Waking the demo server. This usually takes about 60 seconds on the free tier.</span></p>
+    <p class="status"><span class="dot" aria-hidden="true"></span><span id="wakeText">Waking the demo server. This usually takes about 35 seconds on the free tier.</span></p>
     <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar">
       <div class="fill" id="fill"></div>
     </div>
@@ -122,13 +122,13 @@
     <div id="answer" role="status" aria-live="polite"></div>
   </section>
 
-  <p class="note">The demo runs on Render's free tier. It sleeps after 15 minutes idle; the first visit after that takes about a minute.</p>
+  <p class="note">The demo runs on Render's free tier. It sleeps after 15 minutes idle; the first visit after that waits about 35 seconds.</p>
 </main>
 
 <script>
 "use strict";
 const API_BASE = "https://company-ops-agent.onrender.com";
-const EXPECTED_WAKE_SECONDS = 60;
+const EXPECTED_WAKE_SECONDS = 35;
 const POLL_MS = 2000;
 const POLL_TIMEOUT_MS = 8000;
 const HOLD_PERCENT = 90;
