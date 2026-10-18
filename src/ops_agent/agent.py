@@ -69,7 +69,7 @@ def run_agent(question: str, *, tools: Any, client: Any, settings: Settings) -> 
             answer = _text(response.content)
             if not answer and response.stop_reason == "refusal":
                 answer = "The model declined to answer this request."
-            return finish(answer, "end_turn")
+            return finish(answer, response.stop_reason or "end_turn")
 
         if steps == settings.max_steps:
             break

@@ -48,7 +48,8 @@ def test_list_orders(store):
     assert everything["count"] == 60 and len(everything["orders"]) == 50
     shipped = store.list_orders(status="shipped")
     assert shipped["orders"] and all(o["status"] == "shipped" for o in shipped["orders"])
-    assert store.list_orders(status="nonsense") == {"count": 0, "orders": []}
+    bad = store.list_orders(status="nonsense")
+    assert bad["count"] == 0 and bad["orders"] == [] and "error" in bad
 
 
 def test_check_inventory(store):
@@ -88,3 +89,16 @@ def test_data_consistency(store):
         assert o.total_usd == round(sum(i.qty * i.unit_price_usd for i in o.items), 2)
         assert all(i.sku in store._inventory for i in o.items)
     assert sum(1 for i in store._inventory.values() if i.on_hand == 0) >= 2
+
+
+def test_create_ticket_rejects_oversized_text(tmp_path):
+    import shutil
+
+    from ops_agent.store import MAX_BODY_CHARS, MAX_SUBJECT_CHARS, Store
+    shutil.copytree("data", tmp_path / "d")
+    store = Store(tmp_path / "d", tickets_path=tmp_path / "t.json")
+    too_long_subject = store.create_ticket("C-1001", "s" * (MAX_SUBJECT_CHARS + 1), "b")
+    assert too_long_subject["created"] is False
+    too_long_body = store.create_ticket("C-1001", "ok", "b" * (MAX_BODY_CHARS + 1))
+    assert too_long_body["created"] is False
+    assert not (tmp_path / "t.json").exists()  # nothing persisted on rejection

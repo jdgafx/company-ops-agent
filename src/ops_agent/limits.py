@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 import threading
@@ -11,6 +12,12 @@ from collections import deque
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+
+log = logging.getLogger("ops_agent.limits")
+
+
+class CapStateError(Exception):
+    """The counter file exists but cannot be read or parsed. Callers must fail closed."""
 
 
 class RateLimiter:
@@ -44,7 +51,12 @@ def _utc_today() -> str:
 
 
 class DailyCap:
-    """File-backed request and token counters keyed by UTC date."""
+    """File-backed request and token counters keyed by UTC date.
+
+    Fail closed: a counter file that exists but is unreadable or corrupt denies
+    every reservation. Only a missing file means "nothing spent yet".
+    Single process only: the lock is in-process, so run one worker.
+    """
 
     def __init__(
         self,
@@ -62,16 +74,21 @@ class DailyCap:
     def _load(self) -> dict:
         day = self._today()
         try:
-            data = json.loads(self.path.read_text())
-            if data.get("date") == day:
-                return {
-                    "date": day,
-                    "requests": int(data.get("requests", 0)),
-                    "tokens": int(data.get("tokens", 0)),
-                }
-        except (OSError, ValueError, TypeError, AttributeError):
-            pass
-        return {"date": day, "requests": 0, "tokens": 0}
+            raw = self.path.read_text()
+        except FileNotFoundError:
+            return {"date": day, "requests": 0, "tokens": 0}
+        except OSError as exc:
+            raise CapStateError(f"cannot read {self.path}: {exc}") from exc
+        try:
+            data = json.loads(raw)
+            requests = int(data["requests"])
+            tokens = int(data["tokens"])
+            stored_day = data["date"]
+        except (ValueError, TypeError, KeyError, AttributeError) as exc:
+            raise CapStateError(f"corrupt counter file {self.path}: {exc}") from exc
+        if stored_day != day:
+            return {"date": day, "requests": 0, "tokens": 0}
+        return {"date": day, "requests": requests, "tokens": tokens}
 
     def _save(self, data: dict) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -84,19 +101,39 @@ class DailyCap:
             Path(tmp).unlink(missing_ok=True)
             raise
 
-    def check(self, tokens_needed_estimate: int = 0) -> bool:
-        """True if one more request, and the estimated tokens, fit under today's caps."""
-        with self._lock:
-            d = self._load()
-            return (
-                d["requests"] < self.request_cap
-                and d["tokens"] + tokens_needed_estimate <= self.token_cap
-            )
+    def reserve(self, estimate: int) -> bool:
+        """Count one request and `estimate` tokens BEFORE the paid call.
 
-    def record(self, tokens_used: int) -> None:
-        """Count one request and its tokens against today."""
+        Returns False (deny) when a cap would be exceeded, the counter file is
+        corrupt, or the counter cannot be saved. Reservation and check are one
+        step under the lock, so concurrent requests cannot overshoot the caps.
+        """
+        estimate = max(0, int(estimate))
         with self._lock:
-            d = self._load()
-            d["requests"] += 1
-            d["tokens"] += max(0, int(tokens_used))
-            self._save(d)
+            try:
+                d = self._load()
+                if d["requests"] >= self.request_cap or d["tokens"] + estimate > self.token_cap:
+                    return False
+                d["requests"] += 1
+                d["tokens"] += estimate
+                self._save(d)
+            except (CapStateError, OSError) as exc:
+                log.error("daily cap denied request: %s", exc)
+                return False
+            return True
+
+    def settle(self, estimate: int, actual_tokens: int | None) -> None:
+        """Replace a reservation's estimate with the real token count.
+
+        `actual_tokens=None` (the run failed, so usage is unknown) keeps the
+        estimate charged. Call once per successful reserve().
+        """
+        with self._lock:
+            try:
+                d = self._load()
+                actual = max(0, int(actual_tokens)) if actual_tokens is not None else int(estimate)
+                d["tokens"] = max(0, d["tokens"] + actual - int(estimate))
+                self._save(d)
+            except (CapStateError, OSError) as exc:
+                # Counter is now unreadable; reserve() will deny until it is repaired.
+                log.error("daily cap settle failed: %s", exc)

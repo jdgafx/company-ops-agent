@@ -1,6 +1,6 @@
 # PLAN: company-ops-agent (SK.2 showcase project 1)
 
-Goal: a Python agent service. An LLM agent answers and acts on questions about a fictional company's data by calling tools in a loop it decides for itself (no fixed retrieve-then-answer pipeline). Tools are served by the project's own MCP server. The service has a FastAPI API, an eval suite that gates CI, pytest tests, Docker, and a free-tier cloud deploy.
+Goal: a Python agent service. An LLM agent answers and acts on questions about a fictional company's data by calling tools in a loop it decides for itself (no fixed retrieve-then-answer pipeline). Tools live in one shared registry; the agent calls it in process, and the project's own MCP server exposes the same registry to external MCP clients (deviation from the first draft, which had the agent call the MCP server as a client; decided 2026-10-17 to keep the loop simple). The service has a FastAPI API, an eval suite that gates CI, pytest tests, Docker, and a free-tier cloud deploy.
 
 Done = the SK.2 done-when list: public repo URL; CI green including the eval gate; live deploy URL answers; README with diagram and eval table; evidence file reviews/evidence/portfolio-lead-SK2-agent-service.md.
 Do-not-touch: no paid cloud spend; no secrets in git; no change to the 13 existing apps.

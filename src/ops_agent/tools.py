@@ -50,7 +50,8 @@ class ToolRegistry:
         except TypeError as exc:  # wrong or missing keyword arguments
             return _error("bad_arguments", str(exc))
         except Exception as exc:  # noqa: BLE001 - tool bugs must not crash the agent loop
-            return _error("tool_failed", f"{type(exc).__name__}: {exc}")
+            # Class name only: exception text can echo input or internals back to the model.
+            return _error("tool_failed", f"{type(exc).__name__} while running {name}")
         return {"ok": True, "data": result}
 
 

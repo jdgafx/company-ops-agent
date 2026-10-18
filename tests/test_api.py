@@ -71,8 +71,9 @@ def test_daily_request_cap(tmp_path):
 
 
 def test_daily_token_cap(tmp_path):
-    # estimate is max_tokens*max_steps = 800; each run records 50
-    c = make(tmp_path, OPS_DAILY_TOKEN_CAP=840, OPS_RATE_LIMIT_PER_MIN=100)
+    # allowance 0 makes the estimate max_tokens*max_steps = 800; each run settles to 50
+    c = make(tmp_path, OPS_DAILY_TOKEN_CAP=840, OPS_RATE_LIMIT_PER_MIN=100,
+             OPS_STEP_INPUT_TOKEN_ALLOWANCE=0)
     assert ask(c).status_code == 200  # 0+800 <= 840
     assert ask(c).status_code == 429  # 50+800 > 840
     assert json.loads((tmp_path / "limits.json").read_text())["tokens"] == 50
@@ -126,3 +127,13 @@ def test_default_runner_persists_tickets_across_requests(tmp_path, monkeypatch):
     run("open a ticket for C-1002, I confirm")
     saved = json.loads(tickets.read_text())
     assert [t["id"] for t in saved] == ["T-9001", "T-9002"]
+
+
+def test_failed_run_is_charged_and_counted(tmp_path):
+    def boom(_q):
+        raise RuntimeError("upstream down")
+
+    c = make(tmp_path, runner=boom, OPS_RATE_LIMIT_PER_MIN=100, OPS_DAILY_REQUEST_CAP=5)
+    assert ask(c).status_code == 500
+    saved = json.loads((tmp_path / "limits.json").read_text())
+    assert saved["requests"] == 1 and saved["tokens"] > 0

@@ -72,7 +72,12 @@ def create_app(
     limiter = RateLimiter(per_min)
     daily = DailyCap(limits_path or env_path, req_cap, tok_cap)
     run = runner or _default_runner(settings, registry)
-    token_estimate = int(getattr(settings, "max_tokens", 0)) * int(getattr(settings, "max_steps", 1))
+    # Worst case per request: every step pays max_tokens output plus a fixed input allowance
+    # (tool definitions, history and tool results). Reserved up front, then settled.
+    step_allowance = int(os.environ.get("OPS_STEP_INPUT_TOKEN_ALLOWANCE", "8000"))
+    token_estimate = int(getattr(settings, "max_steps", 1)) * (
+        int(getattr(settings, "max_tokens", 0)) + step_allowance
+    )
 
     app = FastAPI(title="company-ops-agent")
 
@@ -88,15 +93,17 @@ def create_app(
             return JSONResponse(
                 {"error": "rate_limited"}, status_code=429, headers={"Retry-After": str(retry_after)}
             )
-        if not daily.check(token_estimate):
+        if not daily.reserve(token_estimate):
             return JSONResponse({"error": "daily_cap_reached"}, status_code=429)
         try:
             result = run(body.question)
         except Exception:
             log.exception("agent run failed")
+            daily.settle(token_estimate, None)  # usage unknown: keep the reservation charged
             return JSONResponse({"error": "internal_error"}, status_code=500)
         usage = result.get("usage") or {}
-        daily.record(int(usage.get("input_tokens", 0)) + int(usage.get("output_tokens", 0)))
+        actual = int(usage.get("input_tokens", 0)) + int(usage.get("output_tokens", 0))
+        daily.settle(token_estimate, actual)
         return result
 
     return app

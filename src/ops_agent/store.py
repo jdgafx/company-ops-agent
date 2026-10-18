@@ -14,6 +14,10 @@ from typing import Any
 
 from pydantic import BaseModel
 
+MAX_SUBJECT_CHARS = 200
+MAX_BODY_CHARS = 4000
+ORDER_STATUSES = frozenset({"placed", "shipped", "delivered", "cancelled"})
+
 
 class Customer(BaseModel):
     id: str
@@ -75,7 +79,8 @@ class Store:
         limit = max(1, min(50, int(limit)))
         q = str(query).strip().lower()
         hits = [
-            c for c in self._customers.values()
+            c
+            for c in self._customers.values()
             if q and (q in c.name.lower() or q in c.email.lower())
         ]
         return {
@@ -98,6 +103,12 @@ class Store:
 
     def list_orders(self, status: str | None = None, limit: int = 20) -> dict[str, Any]:
         limit = max(1, min(50, int(limit)))
+        if status is not None and status not in ORDER_STATUSES:
+            return {
+                "count": 0,
+                "orders": [],
+                "error": f"status must be one of {sorted(ORDER_STATUSES)}",
+            }
         rows = [o for o in self._orders.values() if status is None or o.status == status]
         return {
             "count": len(rows),
@@ -118,6 +129,10 @@ class Store:
     def create_ticket(self, customer_id: str, subject: str, body: str) -> dict[str, Any]:
         if customer_id not in self._customers:
             return {"created": False, "error": "unknown customer", "customer_id": customer_id}
+        if not subject.strip() or len(subject) > MAX_SUBJECT_CHARS:
+            return {"created": False, "error": f"subject must be 1-{MAX_SUBJECT_CHARS} characters"}
+        if len(body) > MAX_BODY_CHARS:
+            return {"created": False, "error": f"body must be at most {MAX_BODY_CHARS} characters"}
         ticket = Ticket(
             id=f"T-{9001 + len(self._tickets)}",
             customer_id=customer_id,
