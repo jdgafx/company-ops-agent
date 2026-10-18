@@ -137,3 +137,67 @@ class DailyCap:
             except (CapStateError, OSError) as exc:
                 # Counter is now unreadable; reserve() will deny until it is repaired.
                 log.error("daily cap settle failed: %s", exc)
+
+
+class DemoDailyCap(DailyCap):
+    """Daily total for the free demo: a request count and spend in integer micro-USD.
+
+    Same file-backed, fail-closed behaviour as DailyCap, in its own file. Micro-USD
+    integers avoid float drift. Reserve the worst case first, then settle with the
+    real cost; a failed run stays charged at the reserved amount.
+    """
+
+    def __init__(
+        self,
+        path: str | Path,
+        request_cap: int,
+        micro_usd_cap: int,
+        today: Callable[[], str] = _utc_today,
+    ):
+        super().__init__(path, request_cap, micro_usd_cap, today)
+
+    def _load(self) -> dict:
+        day = self._today()
+        try:
+            raw = self.path.read_text()
+        except FileNotFoundError:
+            return {"date": day, "requests": 0, "micro_usd": 0}
+        except OSError as exc:
+            raise CapStateError(f"cannot read {self.path}: {exc}") from exc
+        try:
+            data = json.loads(raw)
+            requests = int(data["requests"])
+            micro = int(data["micro_usd"])
+            stored_day = data["date"]
+        except (ValueError, TypeError, KeyError, AttributeError) as exc:
+            raise CapStateError(f"corrupt counter file {self.path}: {exc}") from exc
+        if stored_day != day:
+            return {"date": day, "requests": 0, "micro_usd": 0}
+        return {"date": day, "requests": requests, "micro_usd": micro}
+
+    def reserve(self, estimate_micro: int) -> bool:
+        """Count one request and `estimate_micro` micro-USD BEFORE the paid call."""
+        estimate_micro = max(0, int(estimate_micro))
+        with self._lock:
+            try:
+                d = self._load()
+                if d["requests"] >= self.request_cap or d["micro_usd"] + estimate_micro > self.token_cap:
+                    return False
+                d["requests"] += 1
+                d["micro_usd"] += estimate_micro
+                self._save(d)
+            except (CapStateError, OSError) as exc:
+                log.error("demo cap denied request: %s", exc)
+                return False
+            return True
+
+    def settle(self, estimate_micro: int, actual_micro: int | None) -> None:
+        """Replace the reservation with the real cost; None keeps the estimate charged."""
+        with self._lock:
+            try:
+                d = self._load()
+                actual = max(0, int(actual_micro)) if actual_micro is not None else int(estimate_micro)
+                d["micro_usd"] = max(0, d["micro_usd"] + actual - int(estimate_micro))
+                self._save(d)
+            except (CapStateError, OSError) as exc:
+                log.error("demo cap settle failed: %s", exc)

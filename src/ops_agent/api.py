@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -11,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from ops_agent.limits import DailyCap, RateLimiter
+from ops_agent.limits import DailyCap, DemoDailyCap, RateLimiter
 
 if TYPE_CHECKING:
     from ops_agent.config import Settings
@@ -63,6 +64,43 @@ class AskRequest(BaseModel):
     @classmethod
     def _strip(cls, v: Any) -> Any:
         return v.strip() if isinstance(v, str) else v
+
+
+def client_identity(request: Request) -> str:
+    """Rate-limit identity. Behind a proxy the RIGHTMOST X-Forwarded-For entry is the address
+    the nearest proxy saw; earlier entries are client-supplied and can be spoofed."""
+    entries = [p.strip() for p in request.headers.get("x-forwarded-for", "").split(",")]
+    entries = [p for p in entries if p]
+    if entries:
+        return entries[-1][:64]
+    return request.client.host if request.client else "unknown"
+
+
+DEMO_HOURLY_DETAIL = (
+    "You have used this demo's free questions for this hour. Try again later, "
+    f"or send your own OpenRouter key in the {KEY_HEADER} header."
+)
+DEMO_DAILY_DETAIL = (
+    "The free demo has reached its daily limit. Try again tomorrow, "
+    f"or send your own OpenRouter key in the {KEY_HEADER} header."
+)
+
+
+class DemoConfig:
+    """Free-demo limits and prices, read once from the environment."""
+
+    def __init__(self) -> None:
+        env = os.environ.get
+        self.per_hour = int(env("OPS_DEMO_PER_HOUR_PER_CLIENT", "3"))
+        self.daily_requests = int(env("OPS_DEMO_DAILY_REQUESTS", "20"))
+        self.daily_micro_usd = round(float(env("OPS_DEMO_DAILY_USD", "0.10")) * 1_000_000)
+        self.price_in = float(env("OPS_DEMO_PRICE_IN_PER_MTOK", "0.10"))  # USD per 1M tokens
+        self.price_out = float(env("OPS_DEMO_PRICE_OUT_PER_MTOK", "0.50"))
+        self.path = env("OPS_DEMO_LIMITS_PATH", "./data/demo-limits.runtime.json")
+
+    def micro_usd(self, input_tokens: int, output_tokens: int) -> int:
+        """Cost in micro-USD, rounded up. USD per 1M tokens equals micro-USD per token."""
+        return math.ceil(input_tokens * self.price_in + output_tokens * self.price_out)
 
 
 def _limits_from_env() -> tuple[int, int, int, str]:
@@ -137,7 +175,58 @@ def create_app(
         int(getattr(settings, "max_tokens", 0)) + step_allowance
     )
 
+    # Free demo: a host-held key serves keyless requests. Read once; never returned or logged.
+    demo_key = (os.environ.get("OPS_DEMO_PROVIDER_KEY") or "").strip()
+    demo = DemoConfig() if demo_key else None
+    if demo is not None:
+        demo_limiter = RateLimiter(demo.per_hour, window=3600.0)
+        demo_daily = DemoDailyCap(
+            demo.path, demo.daily_requests, demo.daily_micro_usd
+        )
+        demo_reserve = demo.micro_usd(
+            int(getattr(settings, "max_steps", 1)) * step_allowance,
+            int(getattr(settings, "max_steps", 1)) * int(getattr(settings, "max_tokens", 0)),
+        )
+
     app = FastAPI(title="company-ops-agent")
+
+    def ask_demo(question: str, ip: str):
+        allowed, retry_after = demo_limiter.allow(ip)
+        if not allowed:
+            return JSONResponse(
+                {"error": "demo_hourly_limit", "detail": DEMO_HOURLY_DETAIL},
+                status_code=429,
+                headers={"Retry-After": str(retry_after)},
+            )
+        if not demo_daily.reserve(demo_reserve):
+            return JSONResponse(
+                {"error": "demo_daily_limit_reached", "detail": DEMO_DAILY_DETAIL},
+                status_code=429,
+            )
+        try:
+            if runner is not None:
+                result = run(question)
+            else:
+                try:
+                    model_client = _GuardedClient(factory(demo_key))
+                except Exception as exc:  # noqa: BLE001
+                    log.error("client build failed: %s", type(exc).__name__)
+                    raise ModelCallError from None
+                result = run(question, model_client)
+                del model_client
+        except ModelCallError:
+            demo_daily.settle(demo_reserve, None)  # usage unknown: keep the reservation charged
+            return JSONResponse({"error": "model_call_failed"}, status_code=502)
+        except Exception as exc:  # noqa: BLE001
+            log.error("agent run failed: %s", type(exc).__name__)
+            demo_daily.settle(demo_reserve, None)
+            return JSONResponse({"error": "internal_error"}, status_code=500)
+        usage = result.get("usage") or {}
+        demo_daily.settle(
+            demo_reserve,
+            demo.micro_usd(int(usage.get("input_tokens", 0)), int(usage.get("output_tokens", 0))),
+        )
+        return result
 
     @app.get("/healthz")
     def healthz() -> dict:
@@ -147,6 +236,9 @@ def create_app(
     def ask(body: AskRequest, request: Request):
         # Key checks come first: a keyless or malformed request costs and counts nothing.
         raw_key = request.headers.get(KEY_HEADER, "")
+        ip = client_identity(request)
+        if not raw_key.strip() and demo is not None:
+            return ask_demo(body.question, ip)
         if not raw_key.strip():
             return JSONResponse(
                 {
@@ -158,7 +250,6 @@ def create_app(
         key = _clean_key(raw_key)
         if key is None:
             return JSONResponse({"error": "invalid_key_format"}, status_code=400)
-        ip = request.client.host if request.client else "unknown"
         allowed, retry_after = limiter.allow(ip)
         if not allowed:
             return JSONResponse(
