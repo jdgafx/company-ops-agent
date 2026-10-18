@@ -194,3 +194,14 @@ def test_byok_does_not_touch_demo_counters(env, tmp_path):
     assert r.status_code == 200
     assert factory.keys == [BYOK_KEY]
     assert not (tmp_path / "demo.json").exists()
+
+
+def test_demo_502_keeps_reservation_charged(env, tmp_path):
+    env.setenv("OPS_DEMO_PROVIDER_KEY", DEMO_KEY)
+
+    def bad_factory(key):
+        raise ValueError("boom")
+
+    c, _ = build(bad_factory)
+    assert c.post("/v1/ask", json=Q).status_code == 502
+    assert json.loads((tmp_path / "demo.json").read_text())["micro_usd"] > 0
